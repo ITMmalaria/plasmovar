@@ -103,9 +103,11 @@ workflow PLASMOVAR {
         FASTP (
             ch_samplesheet, // channel: [ val(meta), [ reads ] ]
             ch_adapter_fasta,
+            params.fastp_save_trimmed,
             params.fastp_save_trimmed_fail,
             params.fastp_save_merged
         )
+        ch_trimmed_reads = FASTP.out.reads
         ch_versions = ch_versions.mix(FASTP.out.versions)
         ch_trimmed_reads = FASTP.out.reads
     } else {
@@ -213,7 +215,9 @@ workflow PLASMOVAR {
         ch_multiqc_files.collect(),
         ch_multiqc_config.toList(),
         ch_multiqc_custom_config.toList(),
-        ch_multiqc_logo.toList()
+        ch_multiqc_logo.toList(),
+        [],
+        []
     )
 
     emit:
