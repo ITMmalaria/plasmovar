@@ -63,10 +63,12 @@ workflow PLASMOVAR {
 
     // TODO: bundle fastq preprocessing steps into subworkflow
 
+    // TODO: https://nf-co.re/modules/fastqscreen_fastqscreen
+
     //
     // MODULE: Concatenate FastQ files from same sample if required
     //
-    // TODO: see nf-core/rnaseq
+    // TODO: see nf-core/rnaseq and decide when/where concatenation should happen
 
     //
     // MODULE: Run FastQC
@@ -113,6 +115,8 @@ workflow PLASMOVAR {
     } else {
         ch_trimmed_reads = ch_samplesheet
     }
+    // TODO: use more descriptive name in else clause to avoid wrongly named channels
+    // sarek uses "reads_for_nexttool"
 
     //
     // Host read filtering / host sequence contamination removal / host decontamination
