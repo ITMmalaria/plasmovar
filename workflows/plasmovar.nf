@@ -124,49 +124,55 @@ workflow PLASMOVAR {
     // TODO: examples:
     // https://github.com/nf-core/eager/blob/dev/modules/local/host_removal.nf
     // https://github.com/nf-core/taxprofiler/blob/1.1.7/subworkflows/local/shortread_hostremoval.nf
+    if (!params.skip_hostremoval) {
+        // use provided BBSplit index if supplied or generate from scratch otherwise
+        if (!params.hostremoval_bbsplit_index) {
+            // Prepare channel with list of reference genomes to filter reads against.
+            // Expected format for BBMAP_BBSPLIT module is:
+            //      tuple val(other_ref_names), path (other_ref_paths)
+            //      [['name'], [/path/to/fast.gz]]
+            Channel.from( [
+                [params.hostremoval_bbsplit_reference_name,
+                params.hostremoval_reference]
+            ] )
+                .collect{ id, fasta -> [ [id], [file(fasta, checkIfExists: true)] ] }
+                .set { ch_bbsplit_other_refs }
 
-    // use provided BBSplit index if supplied or generate from scratch otherwise
-    if (!params.hostremoval_bbsplit_index) {
-        // Prepare channel with list of reference genomes to filter reads against.
-        // Expected format for BBMAP_BBSPLIT module is:
-        //      tuple val(other_ref_names), path (other_ref_paths)
-        //      [['name'], [/path/to/fast.gz]]
-        Channel.from( [
-            [params.hostremoval_bbsplit_reference_name,
-            params.hostremoval_reference]
-        ] )
-            .collect{ id, fasta -> [ [id], [file(fasta, checkIfExists: true)] ] }
-            .set { ch_bbsplit_other_refs }
 
+            // create bbsplit index for filtering
+            BBMAP_BBSPLIT_INDEXER (
+                [ [:], [] ],
+                [],
+                Channel.value(file(params.reference)),
+                ch_bbsplit_other_refs,
+                true
+            )
+            ch_bbsplit_index = BBMAP_BBSPLIT_INDEXER.out.index
+            ch_versions = ch_versions.mix(BBMAP_BBSPLIT_INDEXER.out.versions)
+            // bbsplit.sh -Xmx6000M ref_primary="/path/to/primary_genome.fasta"  ref_human="/path/to/contaminant_genome.fa.gz" path=bbsplit_index_output threads=4
+        } else {
+            // Index needs to be the directory `genome/index/bbsplit` which contains a ref subdir,
+            // which in turn contains an index and genome subdir.
+            Sytem.println("Using pre-supplied reference fasta for host removal")
+            ch_bbsplit_index = Channel.value(file(params.hostremoval_bbsplit_index, checkIfExists: true))
+        }
 
-        // create bbsplit index for filtering
-        BBMAP_BBSPLIT_INDEXER (
-            [ [:], [] ],
+        // run bbsplit in map mode
+        BBMAP_BBSPLIT_MAPPER (
+            ch_trimmed_reads,
+            ch_bbsplit_index,
             [],
-            Channel.value(file(params.reference)),
-            ch_bbsplit_other_refs,
-            true
+            [ [], [] ],
+            false
         )
-        ch_bbsplit_index = BBMAP_BBSPLIT_INDEXER.out.index
-        ch_versions = ch_versions.mix(BBMAP_BBSPLIT_INDEXER.out.versions)
-        // bbsplit.sh -Xmx6000M ref_primary="/path/to/primary_genome.fasta"  ref_human="/path/to/contaminant_genome.fa.gz" path=bbsplit_index_output threads=4
+        ch_reads = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
+        ch_versions = ch_versions.mix(BBMAP_BBSPLIT_MAPPER.out.versions.first())
+        // TODO ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
+
     } else {
-        // Index needs to be the directory `genome/index/bbsplit` which contains a ref subdir,
-        // which in turn contains an index and genome subdir.
-        Sytem.println("Using pre-supplied reference fasta for host removal")
-        ch_bbsplit_index = Channel.value(file(params.hostremoval_bbsplit_index, checkIfExists: true))
+        ch_reads = ch_trimmed_reads
     }
 
-    // run bbsplit in map mode
-    BBMAP_BBSPLIT_MAPPER (
-        ch_trimmed_reads,
-        ch_bbsplit_index,
-        [],
-        [ [], [] ],
-        false
-    )
-    ch_reads = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
-    ch_versions = ch_versions.mix(BBMAP_BBSPLIT_MAPPER.out.versions.first())
 
     //
     // Collate and save software versions
