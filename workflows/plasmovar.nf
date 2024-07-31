@@ -17,6 +17,7 @@ include { MULTIQC                                } from '../modules/nf-core/mult
 include { FASTP                                  } from '../modules/nf-core/fastp/main'
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_INDEXER } from '../modules/nf-core/bbmap/bbsplit/main'
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_MAPPER  } from '../modules/nf-core/bbmap/bbsplit/main'
+include { BWA_INDEX                              } from '../modules/nf-core/bwa/index/main'
 include { paramsSummaryMap                       } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -52,6 +53,14 @@ workflow PLASMOVAR {
 
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
+
+    // TODO create channel holding reference genome
+    // Note: bwa_index expects meta channel, whereas bbsplit_indexer just needs a path
+    // ch_reference = Channel.value(file(params.reference))
+    // ch_reference = Channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
+    // reference = [[ id:'reference', primary:true ], file(params.reference)]
+
+
 
     // TODO: allow either a single fasta reference file to be supplied or multiple ones
     // via samplesheet column or via extra file listing species name + reference path
@@ -174,9 +183,15 @@ workflow PLASMOVAR {
         // TODO ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
 
     } else {
-        ch_reads = ch_trimmed_reads
-    }
 
+    //
+    // Index reference genome
+    //
+    BWA_INDEX (
+        Channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
+    )
+    // TODO: use .versions.first() or just .versions?
+    ch_versions = ch_versions.mix(BWA_INDEX.out.versions.first())
 
     //
     // Collate and save software versions
