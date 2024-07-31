@@ -74,7 +74,7 @@ workflow PLASMOVAR {
     FASTQC (
         ch_samplesheet
     )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})  // MultiQC's fastqc module requires the zip output - https://multiqc.info/modules/fastqc/
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
     //
@@ -109,7 +109,7 @@ workflow PLASMOVAR {
         )
         ch_trimmed_reads = FASTP.out.reads
         ch_versions = ch_versions.mix(FASTP.out.versions)
-        ch_trimmed_reads = FASTP.out.reads
+        ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
     } else {
         ch_trimmed_reads = ch_samplesheet
     }
