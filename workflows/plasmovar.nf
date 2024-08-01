@@ -109,6 +109,7 @@ workflow PLASMOVAR {
     //                      3) --adapter_sequence_r1/2, 4) fasta file
     // ALSO CHANGE MODULES.CONFIG e.g.             withName: '.*:FASTQ_FASTQC_UMITOOLS_FASTP:FASTP'
     // TODO: add option for single-ended reads
+    // TODO: check fastp on split fastq option: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
     if (!params.skip_trimming) {
         ch_adapter_fasta = params.fastp_adapter_fasta ? Channel.fromPath(param, checkIfExists: true).collect() : []
         FASTP (
@@ -119,8 +120,9 @@ workflow PLASMOVAR {
             params.fastp_save_merged
         )
         ch_reads_for_hostremoval = FASTP.out.reads
-        ch_versions = ch_versions.mix(FASTP.out.versions)
+        ch_versions = ch_versions.mix(FASTP.out.versions.first())
         ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
+    // TODO: re-run fastQC after fastp, or just rely on subworkflow mentioned above
     } else {
         ch_reads_for_hostremoval = ch_samplesheet
     }
@@ -131,9 +133,10 @@ workflow PLASMOVAR {
     // Host read filtering / host sequence contamination removal / host decontamination
     //
 
-    // TODO: add bwa decontamination option
+    // TODO: add BWA decontamination option
     // TODO: move to subworkflow
-    // TODO: use file with list of fasta paths and names
+    // TODO: use file with list of fasta paths and names? samplesheet could contain species
+    // cf. samplesheet could mention which species to map against in bbsplit (human) and fastq screen
     // TODO: examples:
     // https://github.com/nf-core/eager/blob/dev/modules/local/host_removal.nf
     // https://github.com/nf-core/taxprofiler/blob/1.1.7/subworkflows/local/shortread_hostremoval.nf
@@ -156,7 +159,7 @@ workflow PLASMOVAR {
             BBMAP_BBSPLIT_INDEXER (
                 [ [:], [] ],
                 [],
-                Channel.value(file(params.reference)),
+                Channel.value(file(params.reference, checkIfExists: true)),
                 ch_bbsplit_other_refs,
                 true
             )
