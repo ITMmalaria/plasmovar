@@ -118,11 +118,11 @@ workflow PLASMOVAR {
             params.fastp_save_trimmed_fail,
             params.fastp_save_merged
         )
-        ch_trimmed_reads = FASTP.out.reads
+        ch_reads_for_hostremoval = FASTP.out.reads
         ch_versions = ch_versions.mix(FASTP.out.versions)
         ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
     } else {
-        ch_trimmed_reads = ch_samplesheet
+        ch_reads_for_hostremoval = ch_samplesheet
     }
     // TODO: use more descriptive name in else clause to avoid wrongly named channels
     // sarek uses "reads_for_nexttool"
@@ -172,17 +172,19 @@ workflow PLASMOVAR {
 
         // run bbsplit in map mode
         BBMAP_BBSPLIT_MAPPER (
-            ch_trimmed_reads,
+            ch_reads_for_hostremoval,
             ch_bbsplit_index,
             [],
             [ [], [] ],
             false
         )
-        ch_reads = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
+        ch_reads_for_alignment = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
         ch_versions = ch_versions.mix(BBMAP_BBSPLIT_MAPPER.out.versions.first())
         // TODO ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
 
     } else {
+        ch_reads_for_alignment = ch_reads_for_hostremoval
+    }
 
     //
     // Index reference genome
