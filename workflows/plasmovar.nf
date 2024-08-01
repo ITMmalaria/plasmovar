@@ -192,11 +192,17 @@ workflow PLASMOVAR {
     //
     // Index reference genome
     //
-    BWA_INDEX (
-        Channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
-    )
-    // TODO: use .versions.first() or just .versions?
-    ch_versions = ch_versions.mix(BWA_INDEX.out.versions.first())
+    if (!params.reference_index) {
+        BWA_INDEX (
+            Channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
+        )
+        ch_bwa_index = BWA_INDEX.out.index.collect()
+        // TODO: use .versions.first() or just .versions?
+        ch_versions = ch_versions.mix(BWA_INDEX.out.versions.first())
+    } else {
+        ch_bwa_index = Channel.value(file(params.reference_index, checkIfExists: true))
+    }
+
 
     //
     // Collate and save software versions
