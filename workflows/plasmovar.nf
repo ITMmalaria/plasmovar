@@ -184,8 +184,8 @@ workflow PLASMOVAR {
         )
         ch_reads_for_alignment = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
         ch_versions = ch_versions.mix(BBMAP_BBSPLIT_MAPPER.out.versions.first())
-        // TODO ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
-
+        // ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.stats.collect{it[1]})
+        // TODO multiqc bbsplit not showing up due to bug https://github.com/MultiQC/MultiQC/pull/1513
     } else {
         ch_reads_for_alignment = ch_reads_for_hostremoval
     }
@@ -203,6 +203,11 @@ workflow PLASMOVAR {
         ch_versions = ch_versions.mix(BWA_INDEX.out.versions.first())
     } else {
         ch_bwa_index = Channel.value(file(params.reference_index, checkIfExists: true))
+    }
+    // TODO conditional exit or only use skips?
+    if (params.only_build_reference) {
+        System.println("conditional check only build reference")
+        System.exit(0)
     }
 
     //
