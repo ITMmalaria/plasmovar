@@ -18,6 +18,7 @@ include { FASTP                                  } from '../modules/nf-core/fast
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_INDEXER } from '../modules/nf-core/bbmap/bbsplit/main'
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_MAPPER  } from '../modules/nf-core/bbmap/bbsplit/main'
 include { BWA_INDEX                              } from '../modules/nf-core/bwa/index/main'
+include { BWA_MEM                                } from '../modules/nf-core/bwa/mem/main'
 include { paramsSummaryMap                       } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -190,6 +191,7 @@ workflow PLASMOVAR {
     }
 
     //
+    // MODULE: Run bwa index
     // Index reference genome
     //
     if (!params.reference_index) {
@@ -203,6 +205,21 @@ workflow PLASMOVAR {
         ch_bwa_index = Channel.value(file(params.reference_index, checkIfExists: true))
     }
 
+    //
+    // MODULE: Run bwa mem
+    // Alignment to reference genome
+    //
+    BWA_MEM (
+        ch_reads_for_alignment,
+        ch_bwa_index,
+        // ch_bwa_index.map{ it -> [ [ id:'index' ], it ] },
+        [[id:'no_fasta'], []],
+        // [[],[]],
+        // sort
+        true
+    )
+    ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
+    // logs?
 
     //
     // Collate and save software versions

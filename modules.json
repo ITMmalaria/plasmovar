@@ -15,7 +15,9 @@
                         "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
                         "installed_by": ["modules"]
                     },
-                        "git_sha": "e0ff65e1fb313677de09f5f477ae3da30ce19b7b",
+                    "bwa/mem": {
+                        "branch": "master",
+                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
                         "installed_by": ["modules"]
                     },
                     "fastp": {
