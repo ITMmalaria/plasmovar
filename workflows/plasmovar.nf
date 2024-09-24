@@ -214,6 +214,7 @@ workflow PLASMOVAR {
     // MODULE: Run bwa mem
     // Alignment to reference genome
     //
+    sort_bam = true
     BWA_MEM (
         ch_reads_for_alignment,
         ch_bwa_index,
@@ -221,7 +222,7 @@ workflow PLASMOVAR {
         [[id:'no_fasta'], []],
         // [[],[]],
         // sort
-        true
+        sort_bam
     )
     ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
     // logs?
