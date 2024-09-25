@@ -118,10 +118,11 @@ workflow PLASMOVAR {
     // TODO: check fastp on split fastq option: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
     if (!params.skip_trimming) {
         ch_adapter_fasta = params.fastp_adapter_fasta ? Channel.fromPath(param, checkIfExists: true).collect() : []
+        discard_trimmed_pass = !params.fastp_save_trimmed
         FASTP (
             ch_samplesheet, // channel: [ val(meta), [ reads ] ]
             ch_adapter_fasta,
-            params.fastp_save_trimmed,
+            discard_trimmed_pass,
             params.fastp_save_trimmed_fail,
             params.fastp_save_merged
         )
