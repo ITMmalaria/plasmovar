@@ -231,7 +231,8 @@ workflow PLASMOVAR {
         sort_bam
     )
     ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
-    // logs?
+    // TODO: when to combine runs/lanes from the same sample/library?
+    // https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L272
 
     //
     // Collate and save software versions
