@@ -80,6 +80,11 @@ workflow PLASMOVAR {
     //
     // TODO: see nf-core/rnaseq and decide when/where concatenation should happen
 
+    // TODO: see description of from samplesheet input validation plugin:
+    //https://github.com/nextflow-io/nf-validation/blob/750a56d02ce902508eb7777188b034d0b8f3435c/docs/samplesheets/examples.md
+    // TODO: also check structure of meta map
+    // TODO: describe columns as done here https://nf-co.re/sarek/3.4.4/docs/usage/
+
     //
     // MODULE: Run FastQC
     //
