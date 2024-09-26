@@ -103,7 +103,7 @@ workflow PIPELINE_INITIALISATION {
             if (meta.lane) {
                 meta = meta + [id: "${meta.sample}-${meta.lane}".toString(), num_lanes: num_lanes.toInteger()]
             }
-            // no need for if statement because id is already included from the start
+            // no need for else statement because id is already included from the start
             return [ meta, fastqs ]
         }
         // [[id:sample_1-1, lane:1, single_end:false, sample:sample_1, num_lanes:2], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]
