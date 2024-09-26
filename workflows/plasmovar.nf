@@ -30,6 +30,63 @@ include { methodsDescriptionText                 } from '../subworkflows/local/u
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+// TODO: move to samplesheet prep subworkflow?
+
+// Add GATK read group to meta and remove lane
+// Adapted from nf-core/sarek: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L940
+def addReadgroupToMeta(meta, files) {
+    def CN = params.seq_center ? "CN:${params.seq_center}\\t" : ''
+    def PL = params.seq_platform ? "PL:${params.seq_platform}\\t" : 'ILLUMINA'
+
+    // Note: needs to be run on initial file path before processing,
+    // otherwise the path in the work dir will not be found
+    def flowcell = flowcellLaneFromFastq(files[0])
+    if ( !meta.single_end && flowcell != flowcellLaneFromFastq(files[1]) ){
+        error("Flowcell ID does not match for paired reads of sample ${meta.id} - ${files}")
+    }
+    // TODO: add unit test
+
+    // Don't use a random element for ID, it breaks resuming
+    // See read group info here: https://gatk.broadinstitute.org/hc/en-us/articles/360035890671-Read-groups
+    // List of RG fields is defined by SAM format: https://samtools.github.io/hts-specs/SAMv1.pdf
+    // Recommended usage: https://support.sentieon.com/appnotes/read_groups/
+    def read_group = "\"@RG\\tID:${meta.sample}.${flowcell}.${meta.lane}\\t${CN}PU:${flowcell}.${meta.lane}\\tSM:${meta.sample}\\tLB:${meta.sample}\\tPL:${params.seq_platform}\""
+    // TODO: add lane versus library column to samplesheet, to distinguish between multiple runs of the same library on different lanes, and distinct libraries
+
+    meta  = meta - meta.subMap('lane') + [read_group: read_group.toString()]
+
+    return [ meta, files ]
+}
+
+// Parse first line of a FASTQ file, return the flowcell id and lane number.
+// Adapted from nf-core/sarek https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L953
+def flowcellLaneFromFastq(path) {
+    // expected format:
+    // xx:yy:FLOWCELLID:LANE:... (seven fields)
+    // or
+    // FLOWCELLID:LANE:xx:... (five fields)
+    def line
+    path.withInputStream {
+        InputStream gzipStream = new java.util.zip.GZIPInputStream(it)
+        Reader decoder = new InputStreamReader(gzipStream, 'ASCII')
+        BufferedReader buffered = new BufferedReader(decoder)
+        line = buffered.readLine()
+    }
+    assert line.startsWith('@')
+    line = line.substring(1)
+    def fields = line.split(':')
+    String fcid
+
+    if (fields.size() >= 7) {
+        // CASAVA 1.8+ format, from  https://support.illumina.com/help/BaseSpace_OLH_009008/Content/Source/Informatics/BS/FileFormat_FASTQ-files_swBS.htm
+        // "@<instrument>:<run number>:<flowcell ID>:<lane>:<tile>:<x-pos>:<y-pos>:<UMI> <read>:<is filtered>:<control number>:<index>"
+        fcid = fields[2]
+    } else if (fields.size() == 5) {
+        fcid = fields[0]
+    }
+    return fcid
+}
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -84,6 +141,12 @@ workflow PLASMOVAR {
     //https://github.com/nextflow-io/nf-validation/blob/750a56d02ce902508eb7777188b034d0b8f3435c/docs/samplesheets/examples.md
     // TODO: also check structure of meta map
     // TODO: describe columns as done here https://nf-co.re/sarek/3.4.4/docs/usage/
+
+
+    // Add read groups to meta
+    if (!params.only_build_reference) {
+        ch_samplesheet = ch_samplesheet.map { meta, fastqs -> addReadgroupToMeta(meta, fastqs) }
+    }
 
     //
     // MODULE: Run FastQC
