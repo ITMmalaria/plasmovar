@@ -108,13 +108,13 @@ workflow PLASMOVAR {
     ch_samplesheet // channel: samplesheet read in from --input
     main:
 
-    ch_versions = Channel.empty()
-    ch_multiqc_files = Channel.empty()
+    ch_versions = channel.empty()
+    ch_multiqc_files = channel.empty()
 
     // TODO create channel holding reference genome
     // Note: bwa_index expects meta channel, whereas bbsplit_indexer just needs a path
-    // ch_reference = Channel.value(file(params.reference))
-    // ch_reference = Channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
+    // ch_reference = channel.value(file(params.reference))
+    // ch_reference = channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
     // reference = [[ id:'reference', primary:true ], file(params.reference)]
 
 
@@ -179,7 +179,7 @@ workflow PLASMOVAR {
     // TODO: add option for single-ended reads
     // TODO: check fastp on split fastq option: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
     if (!params.skip_trimming) {
-        ch_adapter_fasta = params.fastp_adapter_fasta ? Channel.fromPath(param, checkIfExists: true).collect() : []
+        ch_adapter_fasta = params.fastp_adapter_fasta ? channel.fromPath(param, checkIfExists: true).collect() : []
         discard_trimmed_pass = !params.fastp_save_trimmed
         FASTP (
             ch_samplesheet, // channel: [ val(meta), [ reads ] ]
@@ -216,7 +216,7 @@ workflow PLASMOVAR {
             // Expected format for BBMAP_BBSPLIT module is:
             //      tuple val(other_ref_names), path (other_ref_paths)
             //      [['name'], [/path/to/fast.gz]]
-            Channel.from( [
+            channel.from( [
                 [params.hostremoval_bbsplit_reference_name,
                 params.hostremoval_reference]
             ] )
@@ -228,7 +228,7 @@ workflow PLASMOVAR {
             BBMAP_BBSPLIT_INDEXER (
                 [ [:], [] ],
                 [],
-                Channel.value(file(params.reference, checkIfExists: true)),
+                channel.value(file(params.reference, checkIfExists: true)),
                 ch_bbsplit_other_refs,
                 true
             )
@@ -239,7 +239,7 @@ workflow PLASMOVAR {
             // Index needs to be the directory `genome/index/bbsplit` which contains a ref subdir,
             // which in turn contains an index and genome subdir.
             Sytem.println("Using pre-supplied reference fasta for host removal")
-            ch_bbsplit_index = Channel.value(file(params.hostremoval_bbsplit_index, checkIfExists: true))
+            ch_bbsplit_index = channel.value(file(params.hostremoval_bbsplit_index, checkIfExists: true))
         }
 
         // run bbsplit in map mode
@@ -264,13 +264,13 @@ workflow PLASMOVAR {
     //
     if (!params.reference_index) {
         BWA_INDEX (
-            Channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
+            channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
         )
         ch_bwa_index = BWA_INDEX.out.index.collect()
         // TODO: use .versions.first() or just .versions?
         ch_versions = ch_versions.mix(BWA_INDEX.out.versions.first())
     } else {
-        ch_bwa_index = Channel.value(file(params.reference_index, checkIfExists: true))
+        ch_bwa_index = channel.value(file(params.reference_index, checkIfExists: true))
     }
     // TODO conditional exit or only use skips?
     if (params.only_build_reference) {
@@ -299,7 +299,25 @@ workflow PLASMOVAR {
     //
     // Collate and save software versions
     //
-    softwareVersionsToYAML(ch_versions)
+    def topic_versions = channel.topic("versions")
+        .distinct()
+        .branch { entry ->
+            versions_file: entry instanceof Path
+            versions_tuple: true
+        }
+
+    def topic_versions_string = topic_versions.versions_tuple
+        .map { process, tool, version ->
+            [ process[process.lastIndexOf(':')+1..-1], "  ${tool}: ${version}" ]
+        }
+        .groupTuple(by:0)
+        .map { process, tool_versions ->
+            tool_versions.unique().sort()
+            "${process}:\n${tool_versions.join('\n')}"
+        }
+
+    softwareVersionsToYAML(ch_versions.mix(topic_versions.versions_file))
+        .mix(topic_versions_string)
         .collectFile(
             storeDir: "${params.outdir}/pipeline_info",
             name:  'plasmovar_software_'  + 'mqc_'  + 'versions.yml',
@@ -311,24 +329,24 @@ workflow PLASMOVAR {
     //
     // MODULE: MultiQC
     //
-    ch_multiqc_config        = Channel.fromPath(
+    ch_multiqc_config        = channel.fromPath(
         "$projectDir/assets/multiqc_config.yml", checkIfExists: true)
     ch_multiqc_custom_config = params.multiqc_config ?
-        Channel.fromPath(params.multiqc_config, checkIfExists: true) :
-        Channel.empty()
+        channel.fromPath(params.multiqc_config, checkIfExists: true) :
+        channel.empty()
     ch_multiqc_logo          = params.multiqc_logo ?
-        Channel.fromPath(params.multiqc_logo, checkIfExists: true) :
-        Channel.empty()
+        channel.fromPath(params.multiqc_logo, checkIfExists: true) :
+        channel.empty()
 
     summary_params      = paramsSummaryMap(
         workflow, parameters_schema: "nextflow_schema.json")
-    ch_workflow_summary = Channel.value(paramsSummaryMultiqc(summary_params))
+    ch_workflow_summary = channel.value(paramsSummaryMultiqc(summary_params))
     ch_multiqc_files = ch_multiqc_files.mix(
         ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     ch_multiqc_custom_methods_description = params.multiqc_methods_description ?
         file(params.multiqc_methods_description, checkIfExists: true) :
         file("$projectDir/assets/methods_description_template.yml", checkIfExists: true)
-    ch_methods_description                = Channel.value(
+    ch_methods_description                = channel.value(
         methodsDescriptionText(ch_multiqc_custom_methods_description))
 
     ch_multiqc_files = ch_multiqc_files.mix(ch_collated_versions)
