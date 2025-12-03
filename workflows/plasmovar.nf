@@ -179,11 +179,15 @@ workflow PLASMOVAR {
     // TODO: add option for single-ended reads
     // TODO: check fastp on split fastq option: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
     if (!params.skip_trimming) {
-        ch_adapter_fasta = params.fastp_adapter_fasta ? channel.fromPath(param, checkIfExists: true).collect() : []
+        // read adapter file path from input parameters
+        ch_adapter_fasta = params.fastp_adapter_fasta ?
+            channel.fromPath(params.fastp_adapter_fasta, checkIfExists: true).collect() :
+            []
+
         discard_trimmed_pass = !params.fastp_save_trimmed
+
         FASTP (
-            ch_samplesheet, // channel: [ val(meta), [ reads ] ]
-            ch_adapter_fasta,
+            ch_samplesheet.map { meta, reads -> tuple(meta, reads, ch_adapter_fasta)}, // channel: [ val(meta), [ path(reads) ], path(adapters) ]
             discard_trimmed_pass,
             params.fastp_save_trimmed_fail,
             params.fastp_save_merged
