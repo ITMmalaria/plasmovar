@@ -1,4 +1,4 @@
-# pmoris/plasmovar: Contributing Guidelines
+# `pmoris/plasmovar`: Contributing Guidelines
 
 Hi there!
 Many thanks for taking an interest in improving pmoris/plasmovar.
@@ -52,19 +52,19 @@ These tests are run both with the latest available version of `Nextflow` and als
 
 :warning: Only in the unlikely and regretful event of a release happening with a bug.
 
-- On your own fork, make a new branch `patch` based on `upstream/master`.
+- On your own fork, make a new branch `patch` based on `upstream/main` or `upstream/master`.
 - Fix the bug, and bump version (X.Y.Z+1).
-- A PR should be made on `master` from patch to directly this particular bug.
+- Open a pull-request from `patch` to `main`/`master` with the changes.
 
 ## Pipeline contribution conventions
 
-To make the pmoris/plasmovar code and processing logic more understandable for new contributors and to ensure quality, we semi-standardise the way the code and other contributions are written.
+To make the `pmoris/plasmovar` code and processing logic more understandable for new contributors and to ensure quality, we semi-standardise the way the code and other contributions are written.
 
 ### Adding a new step
 
 If you wish to contribute a new step, please use the following coding standards:
 
-1. Define the corresponding input channel into your new process from the expected previous process channel
+1. Define the corresponding input channel into your new process from the expected previous process channel.
 2. Write the process block (see below).
 3. Define the output channel if needed (see below).
 4. Add any new parameters to `nextflow.config` with a default (see below).
@@ -77,13 +77,13 @@ If you wish to contribute a new step, please use the following coding standards:
 
 ### Default values
 
-Parameters should be initialised / defined with default values in `nextflow.config` under the `params` scope.
+Parameters should be initialised / defined with default values within the `params` scope in `nextflow.config`.
 
 Once there, use `nf-core pipelines schema build` to add to `nextflow_schema.json`.
 
 ### Default processes resource requirements
 
-Sensible defaults for process resource requirements (CPUs / memory / time) for a process should be defined in `conf/base.config`. These should generally be specified generic with `withLabel:` selectors so they can be shared across multiple processes/steps of the pipeline. A nf-core standard set of labels that should be followed where possible can be seen in the [nf-core pipeline template](https://github.com/nf-core/tools/blob/master/nf_core/pipeline-template/conf/base.config), which has the default process as a single core-process, and then different levels of multi-core configurations for increasingly large memory requirements defined with standardised labels.
+Sensible defaults for process resource requirements (CPUs / memory / time) for a process should be defined in `conf/base.config`. These should generally be specified generic with `withLabel:` selectors so they can be shared across multiple processes/steps of the pipeline. A nf-core standard set of labels that should be followed where possible can be seen in the [nf-core pipeline template](https://github.com/nf-core/tools/blob/main/nf_core/pipeline-template/conf/base.config), which has the default process as a single core-process, and then different levels of multi-core configurations for increasingly large memory requirements defined with standardised labels.
 
 The process resources can be passed on to the tool dynamically within the process with the `${task.cpus}` and `${task.memory}` variables in the `script:` block.
 
