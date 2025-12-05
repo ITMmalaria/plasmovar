@@ -154,7 +154,6 @@ workflow PLASMOVAR {
         ch_samplesheet
     )
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})  // MultiQC's fastqc module requires the zip output - https://multiqc.info/modules/fastqc/
-    ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
     //
     // MODULE: FASTP - trim reads using fastp
