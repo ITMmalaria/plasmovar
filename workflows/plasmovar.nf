@@ -183,11 +183,9 @@ workflow PLASMOVAR {
             channel.fromPath(params.fastp_adapter_fasta, checkIfExists: true).collect() :
             []
 
-        discard_trimmed_pass = !params.fastp_save_trimmed
-
         FASTP (
             ch_samplesheet.map { meta, reads -> tuple(meta, reads, ch_adapter_fasta)}, // channel: [ val(meta), [ path(reads) ], path(adapters) ]
-            discard_trimmed_pass,
+            false,  // discard_trimmed_pass - Specify true to not write any reads that pass trimming thresholds. This can be used to use fastp for the output report only. Previously set to `!params.fastp_save_trimmed`
             params.fastp_save_trimmed_fail,
             params.fastp_save_merged
         )
