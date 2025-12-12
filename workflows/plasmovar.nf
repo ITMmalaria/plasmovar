@@ -239,7 +239,7 @@ workflow PLASMOVAR {
         } else {
             // Index needs to be the directory `genome/index/bbsplit` which contains a ref subdir,
             // which in turn contains an index and genome subdir.
-            Sytem.println("Using pre-supplied reference fasta for host removal")
+            System.println("Using pre-supplied reference fasta for host removal")
             ch_bbsplit_index = channel.value(file(params.hostremoval_bbsplit_index, checkIfExists: true))
         }
 
