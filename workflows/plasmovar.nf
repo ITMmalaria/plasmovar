@@ -326,19 +326,21 @@ workflow PLASMOVAR {
     // MODULE: Run bwa mem
     // Alignment to reference genome
     //
-    sort_bam = true
-    BWA_MEM (
-        ch_reads_for_alignment,
-        ch_bwa_index,
-        // ch_bwa_index.map{ it -> [ [ id:'index' ], it ] },
-        [[id:'no_fasta'], []],
-        // [[],[]],
-        // sort
-        sort_bam
-    )
-    ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
-    // TODO: when to combine runs/lanes from the same sample/library?
-    // https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L272
+    if (!params.skip_alignment) {
+        sort_bam = true
+        BWA_MEM (
+            ch_reads_for_alignment,
+            ch_bwa_index,
+            // ch_bwa_index.map{ it -> [ [ id:'index' ], it ] },
+            [[id:'no_fasta'], []],
+            // [[],[]],
+            // sort
+            sort_bam
+        )
+        ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
+        // TODO: when to combine runs/lanes from the same sample/library?
+        // https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L272
+    }
 
     //
     // Collate and save software versions
