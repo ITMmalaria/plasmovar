@@ -18,6 +18,7 @@ include { FASTP                                  } from '../modules/nf-core/fast
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_INDEXER } from '../modules/nf-core/bbmap/bbsplit/main'
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_MAPPER  } from '../modules/nf-core/bbmap/bbsplit/main'
 include { DEACON_INDEX                           } from '../modules/nf-core/deacon/index/main'
+include { DEACON_INDEX_DIFF                      } from '../modules/local/deacon/diff/main'
 include { DEACON_FILTER                          } from '../modules/nf-core/deacon/filter/main'
 include { BWA_INDEX                              } from '../modules/nf-core/bwa/index/main'
 include { BWA_MEM                                } from '../modules/nf-core/bwa/mem/main'
@@ -290,6 +291,41 @@ workflow PLASMOVAR {
                 ch_reads_for_hostremoval
                     .map { meta, reads -> [ meta, params.hostremoval_deacon_index ?: [] ,  reads] }
                     .set { ch_deacon_input }
+            }
+
+            if ( params.hostremoval_deacon_diff_fasta ) {
+                def deacon_diff_fasta = file(params.hostremoval_deacon_diff_fasta)
+
+                // returns too many elements
+                // ch_deacon_diff = ch_deacon_input
+                //     .map { meta, index, reads ->
+                //         tuple(
+                //             [ id: deacon_diff_fasta.baseName ],
+                //             index,
+                //             deacon_diff_fasta
+                //         )
+                //     }
+
+                ch_deacon_index = ch_deacon_input
+                    // .map { tuple -> tuple[1] }  // Extract the index from each tuple (index is the second element)
+                    .map { _meta, index, _reads -> [index] }
+                    .unique()
+
+                ch_deacon_diff = ch_deacon_index
+                    .map { index ->
+                        tuple(
+                            [ id: "${index.baseName}_diff_${deacon_diff_fasta.baseName}" ],
+                            index,
+                            deacon_diff_fasta
+                        )
+                    }
+
+                DEACON_INDEX_DIFF(ch_deacon_diff)
+
+                ch_deacon_input = ch_deacon_input
+                    .combine(DEACON_INDEX_DIFF.out.index)
+                    .map { meta, _index, reads, _meta_diff, diff_index -> [ meta, diff_index, reads] }
+                ch_versions = ch_versions.mix(DEACON_INDEX_DIFF.out.versions.first())
             }
 
             // filter reads using deacon against host index
