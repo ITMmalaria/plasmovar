@@ -114,6 +114,9 @@ workflow PLASMOVAR {
     ch_versions = channel.empty()
     ch_multiqc_files = channel.empty()
 
+    // TODO: set correct skip options depending on which "*_only" options were enabled
+    // params.only_build_reference -> skip_trimming, skip_hostremoval, skip_alignment, skip_variantcalling
+
     // TODO create channel holding reference genome
     // Note: bwa_index expects meta channel, whereas bbsplit_indexer just needs a path
     // ch_reference = channel.value(file(params.reference))
@@ -207,16 +210,18 @@ workflow PLASMOVAR {
     // sarek uses "reads_for_nexttool"
 
     //
-    // Host read filtering / host sequence contamination removal / host decontamination
+    // Host removal / depletion / read filtering / host sequence contamination removal / host decontamination
     //
 
     // TODO: add BWA decontamination option
-    // TODO: move to subworkflow
-    // TODO: use file with list of fasta paths and names? samplesheet could contain species
+    // TODO: move to subworkflow?
+    // TODO: use file with list of fasta reference paths and names?
+    // samplesheet could contain species
     // cf. samplesheet could mention which species to map against in bbsplit (human) and fastq screen
     // TODO: examples:
     // https://github.com/nf-core/eager/blob/dev/modules/local/host_removal.nf
     // https://github.com/nf-core/taxprofiler/blob/1.1.7/subworkflows/local/shortread_hostremoval.nf
+
     if (!params.skip_hostremoval) {
 
         if (params.hostremoval_method == "bbsplit") {
@@ -242,7 +247,7 @@ workflow PLASMOVAR {
                     true
                 )
                 ch_bbsplit_index = BBMAP_BBSPLIT_INDEXER.out.index
-                ch_versions = ch_versions.mix(BBMAP_BBSPLIT_INDEXER.out.versions)
+                ch_versions = ch_versions.mix(BBMAP_BBSPLIT_INDEXER.out.versions.first())
                 // bbsplit.sh -Xmx6000M ref_primary="/path/to/primary_genome.fasta"  ref_human="/path/to/contaminant_genome.fa.gz" path=bbsplit_index_output threads=4
             } else {
                 // Index needs to be the directory `genome/index/bbsplit` which contains a ref subdir,
@@ -265,6 +270,7 @@ workflow PLASMOVAR {
             // TODO multiqc bbsplit not showing up due to bug https://github.com/MultiQC/MultiQC/pull/1513
         }
         // use Deacon for host read removal
+        // TODO: add prebuilt pangenome index https://github.com/bede/deacon?tab=readme-ov-file#prebuilt-indexes
         else if (params.hostremoval_method == "deacon") {
 
             // create Deacon index if not provided
@@ -273,7 +279,7 @@ workflow PLASMOVAR {
                 def deacon_fasta = file(params.hostremoval_reference)
                 ch_deacon_fasta = channel.of(
                     tuple(
-                        [ id: deacon_fasta.baseName ],
+                        [ id: deacon_fasta.simpleName ],
                         file(deacon_fasta)
                     )
                 )
@@ -317,7 +323,7 @@ workflow PLASMOVAR {
                 ch_deacon_diff = ch_deacon_index
                     .map { index ->
                         tuple(
-                            [ id: "${index.baseName}_diff_${deacon_diff_fasta.baseName}" ],
+                            [ id: "${index.simpleName}_diff_${deacon_diff_fasta.simpleName}" ],
                             index,
                             deacon_diff_fasta
                         )
