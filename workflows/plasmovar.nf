@@ -349,22 +349,122 @@ workflow PLASMOVAR {
 
     //
     // MODULE: Run bwa index
-    // Index reference genome
+    // Index reference genome if index is not already provided
     //
+
+    // Create channel containing the reference fasta
+    // ch_bwa_fasta = channel.fromPath(params.reference)
+    //     .map { ref -> tuple([ id: ref.simpleName ], ref) }
+    //     .collect()
+    def ref = file(params.reference, checkIfExists: true)
+    def ref_basename = ref.simpleName
+    ch_bwa_fasta = channel.value([
+        [ id: ref_basename ],
+        ref
+    ])
+
     if (!params.reference_index) {
-        BWA_INDEX (
-            channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
-        )
-        ch_bwa_index = BWA_INDEX.out.index.collect()
-        // TODO: use .versions.first() or just .versions?
-        ch_versions = ch_versions.mix(BWA_INDEX.out.versions.first())
+        // Construct bwa index for the reference fasta if it is not supplied by the user
+        BWA_INDEX (ch_bwa_fasta)
+        ch_bwa_index = BWA_INDEX.out.index.collect()    // collect() is required to create a re-usable value channel, otherwise it will only contain a single element which won't be emitted for each of the sample reads in ch_reads_for_alignment
+        ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
     } else {
-        ch_bwa_index = channel.value(file(params.reference_index, checkIfExists: true))
-    }
-    // TODO conditional exit or only use skips?
-    if (params.only_build_reference) {
-        System.println("conditional check only build reference")
-        System.exit(0)
+        // If pre-made index is provided, check if it matches the supplied reference
+        // It should be a path to bwa directory containing *.{amb,ann,btw,pac,sa} files
+
+        def index_dir = file(params.reference_index, checkIfExists: true)
+        def required_extensions = ['amb', 'ann', 'bwt', 'pac', 'sa']
+
+        // Collect index files matching the reference basename
+        // def index_files = required_extensions.collect { ext ->
+        //     file("${index_dir}/${ref_basename}*.${ext}", glob: true)
+        //     // glob is required to handle names like reference.fa.amb vs reference.amb
+        // }
+
+        def index_files = required_extensions.collectMany { ext ->
+            def matches = file("${index_dir}/${ref_basename}*.${ext}", glob: true)
+            // glob is required to handle names like reference.fa.amb vs reference.amb
+            // in case of no glob results, we still need to return an (empty) list
+            matches instanceof List ? matches : [matches]
+        }
+
+        // println "DEBUG: Found ${index_files.size()} files with glob pattern ${ref_basename}*"
+            // index_files.each { println "DEBUG:   - ${it.name}" }
+
+        if (index_files.isEmpty()) {
+            error """
+            No BWA index files found for reference '${ref}' in ${index_dir}
+
+            Expected files matching pattern: ${ref_basename}*.{amb,ann,bwt,pac,sa}
+
+            Please ensure:
+            1. The index directory contains BWA index files
+            2. Index file basenames start with: ${ref_basename}
+            3. Index was built using: bwa index ${ref}
+            """.stripIndent()
+        }
+
+        // extract index basename
+        def basenames = index_files.collect { it.baseName }.unique()
+
+        // println "DEBUG: Unique basenames found: ${basenames}"
+
+        if (basenames.size() > 1) {
+            error """
+            Multiple index file basenames found matching '${ref_basename}*' in ${index_dir}
+            Found basenames: ${basenames.join(', ')}
+
+            Matching files:
+            ${index_files.collect { "  - ${it.name}" }.join('\n')}
+
+            Please ensure only one set of index files matches the reference basename pattern.
+            """.stripIndent()
+        }
+
+        // check if all expected files are present
+        def index_basename = basenames[0]
+
+        // println "DEBUG: Using index basename: ${index_basename}"
+
+        def expected_files = required_extensions.collect { ext ->
+            file("${index_dir}/${index_basename}.${ext}")
+        }
+        def missing_files = expected_files.findAll { !it.exists() }
+        def existing_files = expected_files.findAll { it.exists() }
+
+        // println "DEBUG: Expected files:"
+        //     expected_files.each { println "DEBUG:   - ${it.name} (exists: ${it.exists()})" }
+
+        if (!missing_files.isEmpty()) {
+            error """
+            Incomplete BWA index for '${index_basename}' in ${index_dir}
+
+            Missing files:
+            ${missing_files.collect { "  - ${it.name}" }.join('\n')}
+
+            Found files:
+            ${existing_files.collect { "  - ${it.name}" }.join('\n')}
+
+            A complete BWA index requires all 5 files: ${index_basename}.{amb,ann,bwt,pac,sa}
+            Please rebuild the index using: bwa index ${ref}
+            """.stripIndent()
+        }
+
+        // Create the channel with validated index directory
+        ch_bwa_index = channel.value([
+            [ id: index_basename ],
+            index_dir
+        ])
+
+        // Alternative option using channel.of, requires collect() to create value channel
+        // ch_bwa_index = channel.of(
+        //     tuple(
+        //         [ id: file(params.reference).simpleName ],
+        //         file(params.reference_index, checkIfExists: true)
+        //     )
+        // ).collect()
+        // ch_bwa_index = channel.fromPath(params.reference)
+        //     .map( { ref ->  tuple([ id: ref.simpleName ], file(params.reference_index, checkIfExists: true)) } )
     }
 
     //
@@ -376,10 +476,7 @@ workflow PLASMOVAR {
         BWA_MEM (
             ch_reads_for_alignment,
             ch_bwa_index,
-            // ch_bwa_index.map{ it -> [ [ id:'index' ], it ] },
-            [[id:'no_fasta'], []],
-            // [[],[]],
-            // sort
+            ch_bwa_fasta,
             sort_bam
         )
         ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
