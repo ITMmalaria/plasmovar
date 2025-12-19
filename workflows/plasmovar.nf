@@ -150,13 +150,16 @@ workflow PLASMOVAR {
         ch_samplesheet = ch_samplesheet.map { meta, fastqs -> addReadgroupToMeta(meta, fastqs) }
     }
 
-    //
-    // MODULE: Run FastQC
-    //
-    FASTQC (
-        ch_samplesheet
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})  // MultiQC's fastqc module requires the zip output - https://multiqc.info/modules/fastqc/
+    if (!params.skip_qc) {
+
+        //
+        // MODULE: Run FastQC
+        //
+        FASTQC (
+            ch_samplesheet
+        )
+        ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})  // MultiQC's fastqc module requires the zip output - https://multiqc.info/modules/fastqc/
+    }
 
     //
     // MODULE: FASTP - trim reads using fastp
