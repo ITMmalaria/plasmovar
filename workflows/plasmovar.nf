@@ -22,6 +22,8 @@ include { DEACON_INDEX_DIFF                      } from '../modules/local/deacon
 include { DEACON_FILTER                          } from '../modules/nf-core/deacon/filter/main'
 include { BWA_INDEX                              } from '../modules/nf-core/bwa/index/main'
 include { BWA_MEM                                } from '../modules/nf-core/bwa/mem/main'
+include { SAMTOOLS_FAIDX                         } from '../modules/nf-core/samtools/faidx/main'
+include { GATK4_MARKDUPLICATES                   } from '../modules/nf-core/gatk4/markduplicates/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -378,19 +380,19 @@ workflow PLASMOVAR {
     //
 
     // Create channel containing the reference fasta
-    // ch_bwa_fasta = channel.fromPath(params.reference)
+    // ch_ref_fasta = channel.fromPath(params.reference)
     //     .map { ref -> tuple([ id: ref.simpleName ], ref) }
-    //     .collect()
+    //     .collect()   // or .first()
     def ref = file(params.reference, checkIfExists: true)
     def ref_basename = ref.simpleName
-    ch_bwa_fasta = channel.value([
+    ch_ref_fasta = channel.value([
         [ id: ref_basename ],
         ref
     ])
 
     if (!params.reference_index) {
         // Construct bwa index for the reference fasta if it is not supplied by the user
-        BWA_INDEX (ch_bwa_fasta)
+        BWA_INDEX (ch_ref_fasta)
         ch_bwa_index = BWA_INDEX.out.index.collect()    // collect() is required to create a re-usable value channel, otherwise it will only contain a single element which won't be emitted for each of the sample reads in ch_reads_for_alignment
         ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
     } else {
@@ -501,13 +503,66 @@ workflow PLASMOVAR {
         BWA_MEM (
             ch_reads_for_alignment,
             ch_bwa_index,
-            ch_bwa_fasta,
-            sort_bam
+            ch_ref_fasta,
+            sort_bam        // markduplicates expects coordinate (or query) sorted input
         )
+        ch_bam = BWA_MEM.out.bam
         ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
-        // TODO: when to combine runs/lanes from the same sample/library?
-        // https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L272
     }
+    // TODO: optionally enable CRAM output
+
+    // TODO: when to combine runs/lanes from the same sample/library? how can stalling be avoided?
+    // old sarek approach: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L272
+    // new sarek approach: https://github.com/nf-core/sarek/blob/20f41d1ce8b7ba296ee22adc71fe2da2ebcae93f/subworkflows/local/fastq_preprocess_gatk/main.nf#L163
+
+    //
+    // MODULE: Run picard markduplicates
+    // Mark duplicates using Picard and merge reads derived from same sample using RG values
+    //
+
+    // Index reference fasta as .fai
+    SAMTOOLS_FAIDX(
+        ch_ref_fasta,
+        [[:], []],
+        []
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
+    ch_fai      = SAMTOOLS_FAIDX.out.fai    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai]
+
+    // Group multi-lane/library samples by creating tuple with sample as grouping key
+    ch_bam_grouped = ch_bam
+        // remove unique distinguishing fields in meta data per sample
+        .map { meta, bam ->
+            [ meta - meta.subMap('id', 'read_group', 'single_end') + [ data_type: 'bam' ], bam ]
+        }
+        .groupTuple()
+        .map { meta, bam -> [ [ id: meta.sample ] +  meta, bam ] }  // add new (sample-level) id
+
+    GATK4_MARKDUPLICATES(
+        ch_bam_grouped,
+        ch_ref_fasta.map{ _meta, fasta -> [ fasta ] }.first(),
+        ch_fai.map{ _meta, fai -> fai }.first()
+    )
+    ch_versions = ch_versions.mix(GATK4_MARKDUPLICATES.out.versions)
+    ch_bam_markdup = GATK4_MARKDUPLICATES.out.bam
+
+    // TODO: picard module could be an alternative, but it can only process 1 sample at a time
+    // i.e. it does not merge samples while taking into account read groups.
+    // Requires manual concatenation/combining (https://nf-co.re/modules/samtools_cat/ or
+    // https://nf-co.re/modules/samtools_merge/), sorting
+    // (https://nf-co.re/modules/samtools_sort/) and indexing
+    // (https://nf-co.re/modules/samtools_index/) afterwards.
+    // Possible advantage: multiple read groups linear scales ram requirements
+    // https://gatk.broadinstitute.org/hc/en-us/articles/360035890531-Base-Quality-Score-Recalibration-BQSR
+    // PICARD_MARKDUPLICATES(
+    //     ch_bam,
+    //     ch_ref_fasta,
+    //     ch_fai
+    // )
+
+    // TODO     SAMTOOLS_FAIDX.out.fai.map{ _meta, fai -> fai }.first() vs .collect()
+    // To obtain a channel with just the file, which is not consumed by a task, a value channel is needed.
+    // both first and collect create value channels, but first is clearer and creates a one item singleton channel, whereas collect creates a list.
 
     //
     // Collate and save software versions
