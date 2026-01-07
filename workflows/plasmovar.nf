@@ -37,33 +37,51 @@ include { methodsDescriptionText                 } from '../subworkflows/local/u
 
 // Add GATK read group to meta and remove lane
 // Adapted from nf-core/sarek: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L940
+// See read group info here: https://gatk.broadinstitute.org/hc/en-us/articles/360035890671-Read-groups
+// List of RG fields is defined by SAM format: https://samtools.github.io/hts-specs/SAMv1.pdf
+// Recommended usage: https://support.sentieon.com/appnotes/read_groups/
+// TODO: add unit test
 def addReadgroupToMeta(meta, files) {
-    def RG_CN = params.seq_center ? "${params.seq_center}" : ''
-    // def RG_PL = params.seq_platform ? "PL:${params.seq_platform}\\t" : 'ILLUMINA'   // set as default input parameter instead
-
     // Note: needs to be run on initial file path before processing,
     // otherwise the path in the work dir will not be found
     def flowcell = flowcellLaneFromFastq(files[0])
     if ( !meta.single_end && flowcell != flowcellLaneFromFastq(files[1]) ){
         error("Flowcell ID does not match for paired reads of sample ${meta.id} - ${files}")
     }
-    // TODO: add unit test
+
+    // Define RG values, only adding non-empty values
+    // This avoids problems with Picard and the need for the `VALIDATION_STRINGENCY LENIENT` option,
+    // since there will not be any empty fields like:
+    // @RG	ID:106264-002-079.22NY35LT3.L007	CN:	PU:22NY35LT3.L007	SM:106264-002-079	LB:106264-002-079	PL:ILLUMINA
 
     // If we cannot read the flowcell ID from the fastq file, then we don't use it
     def RG_ID = flowcell ? "${meta.sample}.${flowcell}.${meta.lane}" : "${meta.sample}.${meta.lane}"
-    // Likewise for PU (used by BQSR if present, otherwise defaults to ID)
-    def RG_PU = flowcell ? "${flowcell}.${meta.lane}" : ''
+
     // For LB, check if library is defined in input samplesheet (trim handles case of empty string)
     def RG_LB = meta.library?.trim() ? "${meta.sample}.${meta.library}" : "${meta.sample}"
 
-    // Don't use a random element for ID, it breaks resuming
-    // See read group info here: https://gatk.broadinstitute.org/hc/en-us/articles/360035890671-Read-groups
-    // List of RG fields is defined by SAM format: https://samtools.github.io/hts-specs/SAMv1.pdf
-    // Recommended usage: https://support.sentieon.com/appnotes/read_groups/
-    def read_group = "\"@RG\\tID:${RG_ID}\\tCN:${RG_CN}\\tPU:${RG_PU}\\tSM:${meta.sample}\\tLB:${RG_LB}\\tPL:${params.seq_platform}\""
-    // TODO: add lane versus library column to samplesheet, to distinguish between multiple runs of the same library on different lanes, and distinct libraries
+    def RG_map = [
+        ID: RG_ID,
+        SM: meta.sample,
+        LB: RG_LB,
+        PL: params.seq_platform,                            // defaults to ILLUMINA
+        CN: params.seq_center?.trim() ?: null,              // most likely blank
+        PU: flowcell ? "${flowcell}.${meta.lane}" : null,   // used by BQSR if present, otherwise it defaults to using ID
+    ]
 
-    meta  = meta - meta.subMap('lane') + [read_group: read_group.toString()]
+    // Build RG string: filter out empty fields and format as RG string
+    def RG_fields = RG_map
+            // example input: [ID: "sample1", SM: "sample1", CN: null, PU: "flowcell.L001"]
+        .findAll { _key, value ->
+            value != null && value != ''    // Explicit: keep only non-empty values
+        }   // returns map: [ID: "sample1", SM: "sample1", PU: "flowcell.L001"]
+        .collect { key, value ->
+            "${key}:${value}"               // Format each entry as "KEY:VALUE"
+        }   // returns list: ["ID:sample1", "SM:sample1", "PU:flowcell.L001"]
+
+    def read_group = "\"@RG\\t${RG_fields.join('\\t')}\""
+
+    meta  = meta - meta.subMap('lane', 'library') + [read_group: read_group.toString()]
 
     return [ meta, files ]
 }
