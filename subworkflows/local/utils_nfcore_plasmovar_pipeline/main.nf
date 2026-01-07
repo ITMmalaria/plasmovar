@@ -80,34 +80,62 @@ workflow PIPELINE_INITIALISATION {
     // Adapted from: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/subworkflows/local/samplesheet_to_channel/main.nf
     channel
         .fromList(samplesheetToList(params.input, "${projectDir}/assets/schema_input.json"))
-        // [[id:sample, lane:1], /path/to/sample_L001_R1.fastq.gz, /path/to/sample_L001_R2.fastq.gz]
+        // [[id:sample, lane:1, library:null], /path/to/sample_L001_R1.fastq.gz, /path/to/sample_L001_R2.fastq.gz]
         // [[sample:sample_1, lane:1], /path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]
-        .map {
-            meta, fastq_1, fastq_2 ->
-                if (!fastq_2) {
-                    return [ meta.id, [ meta + [ single_end:true, sample:"$meta.id" ], [ fastq_1 ] ] ]
-                } else {
-                    return [ meta.id, [ meta + [ single_end:false, sample:"$meta.id" ], [ fastq_1, fastq_2 ] ] ]
+        // extract sample id (can be shared by multiple fastq (pairs)), so we can group by it
+        .map { meta, fastq_1, fastq_2 ->
+            // auto-detect lane if not provided
+            if (params.auto_detect_lanes && !meta.lane && meta.id) {
+                def detected_lane = extractLaneFromFilename(fastq_1.toString())
+                if (detected_lane) {
+                    meta = meta + [lane: detected_lane]
+                    log.warn("Auto-detected lane ${detected_lane} for sample ${meta.id} with fastq file(s) ${fastq_1} ${fastq_2}")
                 }
-        }.tap{ ch_samples } // save sample-wise channel
-        // [sample_1, [[id:sample_1, lane:1, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
-        .groupTuple()   // group by sample id -
-        // [sample_1, [[[id:sample_1, lane:1, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]], [[id:sample_1, lane:2, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]]
-        // .view()
-        .map { validateInputSamplesheet(it) }
-        .map { sample, ch_items -> [ sample, ch_items.size() ] } // get number of lanes per sample
-        .combine(ch_samples, by: 0) // for each entry add numLanes
-        // [sample_1, 2, [[id:sample_1, lane:1, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
-        .map {
-            sample, num_lanes, ch_items ->
-            ( meta, fastqs ) = ch_items
-            if (meta.lane) {
-                meta = meta + [id: "${meta.sample}-${meta.lane}".toString(), num_lanes: num_lanes.toInteger()]
             }
-            // no need for else statement because id is already included from the start
+            // handle single and paired-end fastq files
+            if (!fastq_2) {
+                return [ meta.id, [ meta + [ single_end: true, sample: "${meta.id}" ], [ fastq_1 ] ] ]
+            } else {
+                return [ meta.id, [ meta + [ single_end: false, sample: "${meta.id}" ], [ fastq_1, fastq_2 ] ] ]
+            }
+            // TODO compare with nf-core template approach, which uses fewer nested lists + flatten.
+        }
+        .tap{ ch_samples } // save sample-wise channel for later re-use
+        // [sample_1, [[id:sample_1, lane:1, library: null, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
+        // group by sample id
+        .groupTuple()
+        // [sample_1, [[[id:sample_1, lane:1, library:null, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]], [[id:sample_1, lane:2, library:null, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]]
+        .map { validateInputSamplesheet(it) }
+        // calculate number of fastq (pairs) per sample
+        .map { sample, ch_items ->
+            def metas = ch_items.collect { it[0] }
+            def num_entries = ch_items.size()
+            def has_multiple_lanes = metas.collect { it.lane }.findAll { it != null }.unique().size() > 1
+            def has_multiple_libraries = metas.collect { it.library }.findAll { it != null }.unique().size() > 1
+            return [ sample, num_entries, has_multiple_lanes, has_multiple_libraries ]
+        }
+        // [sample_1, 2, true, false]
+        .combine(ch_samples, by: 0)
+        // [sample_1, 2, true, false, [[id:sample_1, lane:1, library:null, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
+        // [sample_1, 2, true, false, [[id:sample_1, lane:2, library:null, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]
+        .map { _sample, num_entries, multi_lane, multi_lib, ch_item ->
+            def ( meta, fastqs ) = ch_item
+
+            // build unique identifier based on sample name, library and lane
+            def id_elements = [meta.sample]
+            if (meta.library) id_elements.add("LIB_${meta.library}")
+            if (meta.lane) id_elements.add("LANE_${meta.lane}")
+
+            meta = meta + [
+                id: id_elements.join('-'),
+                num_entries: num_entries.toInteger(),
+                multiple_lanes: multi_lane,
+                multiple_libraries: multi_lib
+            ]
+
             return [ meta, fastqs ]
         }
-        // [[id:sample_1-1, lane:1, single_end:false, sample:sample_1, num_lanes:2], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]
+        // [[id:sample_1-LANE_1, lane:1, library:null, single_end:false, sample:sample_1, num_entries:2, multiple_lanes:true, multiple_libraries:false], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]
         .set { ch_samplesheet }
 
         // TODO: check new nfcore/tools method:
@@ -199,25 +227,70 @@ workflow PIPELINE_COMPLETION {
 def validateInputSamplesheet(input) {
     // Extract meta arrays - expected format:
     // [sample_1, [[[id:sample_1, lane:1, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]], [[id:sample_1, lane:2, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]]
-    def metas = input[1].collect{ it[0] }
+    def (sample, items) = input
+    def metas = items.collect { it[0] }
 
-    // Perform checks if there are multiple runs for the same sample
+    // Only validate if there are multiple fastq (pair) entries for the same sample
     if (metas.size > 1) {
         // Check that multiple runs of the same sample are of the same datatype i.e. single-end / paired-end
         def endedness_ok = metas.collect{ meta -> meta.single_end }.unique().size == 1
         if (!endedness_ok) {
             error("Please check input samplesheet -> Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
         }
-        // and that lanes (if provided) are unique
-        def lanes_ok = metas.collect{ it.lane }.unique().size == metas.size
-        // def lanes_ok = metas.collect{ it.lane }.unique().size == fastqs.collect{ it[0] }.size   // equivalent to fastqs.size(), but not fastqs.size (=> latter gives length of individual fastq arrays in bag)
-        if (!lanes_ok) {
-            error("Please check input samplesheet -> Multiple runs of a sample must have a different lane or run number to differentiate between them: ${metas[0].id}")
+
+        def has_lane_info = metas.every { it.lane != null }
+        def has_library_info = metas.every { it.library != null }
+
+        // Check if samples have distinguishing info
+        if (!has_lane_info && !has_library_info) {
+            error """
+                Sample '${sample}' has multiple entries but no lane or library information.
+                Please provide either 'lane' or 'library' columns in your samplesheet to distinguish between files.
+            """.stripIndent()
         }
+
+        // Check if lane+library combinations are unique
+        def identifiers = metas.collect { "${it.lane ?: 'NA'}_${it.library ?: 'NA'}" }
+        if (identifiers.size() != identifiers.unique().size()) {
+            error """
+                Sample '${sample}' has duplicate lane/library combinations.
+                Each sample must have a unique combination of lane and library identifiers.
+            """.stripIndent()
+        }
+
+        // TODO: Can optionally be replaced by adding the following to schema_input.json:
+        // "uniqueEntries": ["sample", "lane", "library"]
+        // Should be placed just after the items declaration (i.e. level 0).
+        // However, error message will be less detailed.
+        // Also needs verification whether shared null/[] entries would trigger an error or not.
+
         // TODO: write unit tests for these checks
     }
     return input
 }
+
+//
+// Attempt to extract lane info from fastq filename, as a fallback when this info is not provided
+//
+def extractLaneFromFilename(filename) {
+    // [_\.] - ensures lane is preceded/followed by underscore or dot (not just anywhere)
+    // (\d{1,3}) - capture group for the lane number between 1 and 3 digits long
+    def patterns = [
+        ~/.*[_\.]L(\d{1,3})[_\.].*/,            // _L001_, _L1_, .L01.
+        ~/.*[_\.]lane[_\-]?(\d{1,3})[_\.].*/    // _lane1_ or _lane-01_
+    ]
+
+    return patterns.findResult { pattern ->
+        def matcher = filename =~ pattern
+        if (matcher) {
+            def lane = matcher[0][1]    // matcher format = [sample_L001_R1.fastq.gz, 001]
+            return lane.padLeft(3, '0') // pad lane to 3 digits for consistency
+        }
+        return null // return nothing if no pattern is found
+    }
+
+}
+
 //
 // Generate methods description for MultiQC
 //

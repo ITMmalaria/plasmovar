@@ -38,8 +38,8 @@ include { methodsDescriptionText                 } from '../subworkflows/local/u
 // Add GATK read group to meta and remove lane
 // Adapted from nf-core/sarek: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L940
 def addReadgroupToMeta(meta, files) {
-    def CN = params.seq_center ? "CN:${params.seq_center}\\t" : ''
-    def PL = params.seq_platform ? "PL:${params.seq_platform}\\t" : 'ILLUMINA'
+    def RG_CN = params.seq_center ? "${params.seq_center}" : ''
+    // def RG_PL = params.seq_platform ? "PL:${params.seq_platform}\\t" : 'ILLUMINA'   // set as default input parameter instead
 
     // Note: needs to be run on initial file path before processing,
     // otherwise the path in the work dir will not be found
@@ -49,11 +49,18 @@ def addReadgroupToMeta(meta, files) {
     }
     // TODO: add unit test
 
+    // If we cannot read the flowcell ID from the fastq file, then we don't use it
+    def RG_ID = flowcell ? "${meta.sample}.${flowcell}.${meta.lane}" : "${meta.sample}.${meta.lane}"
+    // Likewise for PU (used by BQSR if present, otherwise defaults to ID)
+    def RG_PU = flowcell ? "${flowcell}.${meta.lane}" : ''
+    // For LB, check if library is defined in input samplesheet (trim handles case of empty string)
+    def RG_LB = meta.library?.trim() ? "${meta.sample}.${meta.library}" : "${meta.sample}"
+
     // Don't use a random element for ID, it breaks resuming
     // See read group info here: https://gatk.broadinstitute.org/hc/en-us/articles/360035890671-Read-groups
     // List of RG fields is defined by SAM format: https://samtools.github.io/hts-specs/SAMv1.pdf
     // Recommended usage: https://support.sentieon.com/appnotes/read_groups/
-    def read_group = "\"@RG\\tID:${meta.sample}.${flowcell}.${meta.lane}\\t${CN}PU:${flowcell}.${meta.lane}\\tSM:${meta.sample}\\tLB:${meta.sample}\\tPL:${params.seq_platform}\""
+    def read_group = "\"@RG\\tID:${RG_ID}\\tCN:${RG_CN}\\tPU:${RG_PU}\\tSM:${meta.sample}\\tLB:${RG_LB}\\tPL:${params.seq_platform}\""
     // TODO: add lane versus library column to samplesheet, to distinguish between multiple runs of the same library on different lanes, and distinct libraries
 
     meta  = meta - meta.subMap('lane') + [read_group: read_group.toString()]
