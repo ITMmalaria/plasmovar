@@ -1,0 +1,73 @@
+nextflow_process {
+
+    name "Test Process CREATE_INTERVALS_BED"
+    script "../main.nf"
+    process "CREATE_INTERVALS_BED"
+
+    tag "modules"
+    tag "modules_nfcore"
+    tag "create_intervals_bed"
+
+    test("sarscov2 - genome fai") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.fai', checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out.bed).match() },
+                {
+                def bedFile = file(process.out.bed.get(0).get(1))   // get file path
+                def bedLines = bedFile.readLines()
+
+                // Check line count
+                assert bedLines.size() == 1
+
+                // Check format
+                def fields = bedLines[0].split('\t')
+                assert fields.size() == 3
+
+                // Check values
+                assert fields[0] == 'MT192765.1'
+                assert fields[1] == '0'
+                assert fields[2] == '29829'
+                }
+            )
+        }
+
+    }
+
+    test("sarscov2 - genome fai - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.fai', checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+            )
+        }
+
+    }
+
+}
