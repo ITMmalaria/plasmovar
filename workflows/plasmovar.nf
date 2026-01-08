@@ -30,6 +30,7 @@ include { SAMTOOLS_FLAGSTAT                      } from '../modules/nf-core/samt
 include { SAMTOOLS_IDXSTATS                      } from '../modules/nf-core/samtools/idxstats/main'
 include { GATK4_MARKDUPLICATES                   } from '../modules/nf-core/gatk4/markduplicates/main'
 include { CREATE_INTERVALS_BED                   } from '../modules/local/create_intervals_bed/main'
+include { MOSDEPTH                               } from '../modules/nf-core/mosdepth/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -589,6 +590,10 @@ workflow PLASMOVAR {
     SAMTOOLS_IDXSTATS(ch_bam_bai)
     ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions)
 
+    //
+    // Module: mosdepth coverage statistics
+    //
+
     CREATE_INTERVALS_BED(ch_fai)
     ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
     // TODO: prepare intervals alternative method to bin regions
@@ -596,6 +601,9 @@ workflow PLASMOVAR {
     // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
     // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
     // TODO add option to supply custom bed file (e.g. ampliseq)
+
+    ch_bam_bai_bed = ch_bam_bai.combine(CREATE_INTERVALS_BED.out.bed.map { _meta, bed -> bed })
+    MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta)
 
     //
     // Collate and save software versions
