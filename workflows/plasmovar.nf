@@ -29,6 +29,7 @@ include { SAMTOOLS_STATS                         } from '../modules/nf-core/samt
 include { SAMTOOLS_FLAGSTAT                      } from '../modules/nf-core/samtools/flagstat/main'
 include { SAMTOOLS_IDXSTATS                      } from '../modules/nf-core/samtools/idxstats/main'
 include { GATK4_MARKDUPLICATES                   } from '../modules/nf-core/gatk4/markduplicates/main'
+include { CREATE_INTERVALS_BED                   } from '../modules/local/create_intervals_bed/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -587,6 +588,14 @@ workflow PLASMOVAR {
     ch_versions = ch_versions.mix(SAMTOOLS_FLAGSTAT.out.versions)
     SAMTOOLS_IDXSTATS(ch_bam_bai)
     ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions)
+
+    CREATE_INTERVALS_BED(ch_fai)
+    ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
+    // TODO: prepare intervals alternative method to bin regions
+    // https://nf-co.re/modules/gatk4_preprocessintervals/
+    // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
+    // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
+    // TODO add option to supply custom bed file (e.g. ampliseq)
 
     //
     // Collate and save software versions
