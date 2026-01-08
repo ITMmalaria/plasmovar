@@ -23,6 +23,11 @@ include { DEACON_FILTER                          } from '../modules/nf-core/deac
 include { BWA_INDEX                              } from '../modules/nf-core/bwa/index/main'
 include { BWA_MEM                                } from '../modules/nf-core/bwa/mem/main'
 include { SAMTOOLS_FAIDX                         } from '../modules/nf-core/samtools/faidx/main'
+include { SAMTOOLS_INDEX                         } from '../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_SORT as SAMTOOLS_SORT_MARKDUP } from '../modules/nf-core/samtools/sort/main'
+include { SAMTOOLS_STATS                         } from '../modules/nf-core/samtools/stats/main'
+include { SAMTOOLS_FLAGSTAT                      } from '../modules/nf-core/samtools/flagstat/main'
+include { SAMTOOLS_IDXSTATS                      } from '../modules/nf-core/samtools/idxstats/main'
 include { GATK4_MARKDUPLICATES                   } from '../modules/nf-core/gatk4/markduplicates/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -563,6 +568,25 @@ workflow PLASMOVAR {
     // TODO     SAMTOOLS_FAIDX.out.fai.map{ _meta, fai -> fai }.first() vs .collect()
     // To obtain a channel with just the file, which is not consumed by a task, a value channel is needed.
     // both first and collect create value channels, but first is clearer and creates a one item singleton channel, whereas collect creates a list.
+
+    //
+    // Module: samtools sorting, indexing and stats collection
+    //
+
+    // TODO: move into subworkflow?
+
+    SAMTOOLS_SORT_MARKDUP(ch_bam_markdup, ch_ref_fasta, 'bai')
+    ch_bam_markdup_sort = SAMTOOLS_SORT_MARKDUP.out.bam
+
+    SAMTOOLS_INDEX(ch_bam_markdup_sort)
+    ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first())
+    ch_bam_bai = ch_bam_markdup_sort.join(SAMTOOLS_INDEX.out.bai)
+
+    SAMTOOLS_STATS(ch_bam_bai, ch_ref_fasta)
+    SAMTOOLS_FLAGSTAT(ch_bam_bai)
+    ch_versions = ch_versions.mix(SAMTOOLS_FLAGSTAT.out.versions)
+    SAMTOOLS_IDXSTATS(ch_bam_bai)
+    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions)
 
     //
     // Collate and save software versions
