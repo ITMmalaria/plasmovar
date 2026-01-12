@@ -594,15 +594,21 @@ workflow PLASMOVAR {
     // Module: mosdepth coverage statistics
     //
 
-    CREATE_INTERVALS_BED(ch_fai)
-    ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
-    // TODO: prepare intervals alternative method to bin regions
-    // https://nf-co.re/modules/gatk4_preprocessintervals/
-    // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
-    // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
-    // TODO add option to supply custom bed file (e.g. ampliseq)
+    if (params.intervals_bed) {
+        bed_file = file(params.reference, checkIfExists: true)
+        ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
+    } else {
+        CREATE_INTERVALS_BED(ch_fai)
+        ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
+        ch_ref_bed = CREATE_INTERVALS_BED.out.bed   // [[id:PlasmoDB-68_Pfalciparum3D7_Genome], /path/to/work/e6/dd568ffd9b39576d3677b1518aa507/PlasmoDB-68_Pfalciparum3D7_Genome.bed]
+        // TODO: prepare intervals alternative method to bin regions
+        // https://nf-co.re/modules/gatk4_preprocessintervals/
+        // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
+        // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
+        // TODO add option to supply custom bed file (e.g. ampliseq)
+    }
 
-    ch_bam_bai_bed = ch_bam_bai.combine(CREATE_INTERVALS_BED.out.bed.map { _meta, bed -> bed })
+    ch_bam_bai_bed = ch_bam_bai.combine(ch_ref_bed.map { _meta, bed -> bed })
     MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta)
 
     //
