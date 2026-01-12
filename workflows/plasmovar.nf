@@ -31,6 +31,10 @@ include { SAMTOOLS_IDXSTATS                      } from '../modules/nf-core/samt
 include { GATK4_MARKDUPLICATES                   } from '../modules/nf-core/gatk4/markduplicates/main'
 include { CREATE_INTERVALS_BED                   } from '../modules/local/create_intervals_bed/main'
 include { MOSDEPTH                               } from '../modules/nf-core/mosdepth/main'
+include { GATK4_CREATESEQUENCEDICTIONARY         } from '../modules/nf-core/gatk4/createsequencedictionary/main'
+include { GATK4_BEDTOINTERVALLIST                } from '../modules/nf-core/gatk4/bedtointervallist/main'
+include { GATK4_INTERVALLISTTOOLS                } from '../modules/nf-core/gatk4/intervallisttools/main'
+// include { BIN_INTERVALS } from '../modules/local/bin_intervals/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -610,6 +614,27 @@ workflow PLASMOVAR {
 
     ch_bam_bai_bed = ch_bam_bai.combine(ch_ref_bed.map { _meta, bed -> bed })
     MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta)
+
+    //
+    // Module: GATK variant calling
+    //
+
+    // Create GATK dictionary
+    GATK4_CREATESEQUENCEDICTIONARY(ch_ref_fasta)
+    ch_versions = ch_versions.mix(GATK4_CREATESEQUENCEDICTIONARY.out.versions)
+    ch_ref_dict = GATK4_CREATESEQUENCEDICTIONARY.out.dict
+
+    // Convert BED to GATK IntervalList
+    GATK4_BEDTOINTERVALLIST(ch_ref_bed, ch_ref_dict)
+    ch_versions = ch_versions.mix(GATK4_BEDTOINTERVALLIST.out.versions)
+
+    // Split chrom/contigs into separate interval_list files for scatter-gather parallel processing
+    GATK4_INTERVALLISTTOOLS(GATK4_BEDTOINTERVALLIST.out.interval_list)
+    ch_versions = ch_versions.mix(GATK4_INTERVALLISTTOOLS.out.versions)
+    ch_intervals = GATK4_INTERVALLISTTOOLS.out.interval_list
+        .flatten()  // One file per scattered interval
+        .map { file -> [interval_file: file] }
+    ch_intervals.view()
 
     //
     // Collate and save software versions
