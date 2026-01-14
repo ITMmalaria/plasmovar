@@ -34,7 +34,7 @@ include { MOSDEPTH                               } from '../modules/nf-core/mosd
 include { GATK4_CREATESEQUENCEDICTIONARY         } from '../modules/nf-core/gatk4/createsequencedictionary/main'
 include { GATK4_BEDTOINTERVALLIST                } from '../modules/nf-core/gatk4/bedtointervallist/main'
 include { GATK4_INTERVALLISTTOOLS                } from '../modules/nf-core/gatk4/intervallisttools/main'
-// include { BIN_INTERVALS } from '../modules/local/bin_intervals/main'
+include { BIN_INTERVALS                          } from '../modules/local/bin_intervals/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -632,9 +632,12 @@ workflow PLASMOVAR {
     GATK4_INTERVALLISTTOOLS(GATK4_BEDTOINTERVALLIST.out.interval_list)
     ch_versions = ch_versions.mix(GATK4_INTERVALLISTTOOLS.out.versions)
     ch_intervals = GATK4_INTERVALLISTTOOLS.out.interval_list
-        .flatten()  // One file per scattered interval
-        .map { file -> [interval_file: file] }
-    ch_intervals.view()
+
+    // Alternative approach to generate scattered interval
+    // BIN_INTERVALS(ch_ref_bed, 1000000, [])
+    // TODO sarek alternative approach: https://github.com/nf-core/sarek/blob/master/modules/local/create_intervals_bed/main.nf
+    // https://github.com/nf-core/sarek/blob/master/subworkflows/local/prepare_intervals/main.nf
+    // https://github.com/nf-core/sarek/blob/master/subworkflows/local/bam_variant_calling_haplotypecaller/main.nf
 
     //
     // Collate and save software versions
