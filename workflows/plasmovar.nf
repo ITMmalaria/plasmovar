@@ -35,6 +35,11 @@ include { GATK4_CREATESEQUENCEDICTIONARY         } from '../modules/nf-core/gatk
 include { GATK4_BEDTOINTERVALLIST                } from '../modules/nf-core/gatk4/bedtointervallist/main'
 include { GATK4_INTERVALLISTTOOLS                } from '../modules/nf-core/gatk4/intervallisttools/main'
 include { BIN_INTERVALS                          } from '../modules/local/bin_intervals/main'
+include { GATK4_HAPLOTYPECALLER                  } from '../modules/nf-core/gatk4/haplotypecaller/main'
+include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk4/genomicsdbimport/main'
+include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk4/genotypegvcfs/main'
+include { GATK4_MERGEVCFS                        } from '../modules/nf-core/gatk4/mergevcfs/main'
+include { TABIX_TABIX                            } from '../modules/nf-core/tabix/tabix/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -615,9 +620,7 @@ workflow PLASMOVAR {
     ch_bam_bai_bed = ch_bam_bai.combine(ch_ref_bed.map { _meta, bed -> bed })
     MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta)
 
-    //
-    // Module: GATK variant calling
-    //
+    // TODO add BQSR
 
     // Create GATK dictionary
     GATK4_CREATESEQUENCEDICTIONARY(ch_ref_fasta)
@@ -628,16 +631,171 @@ workflow PLASMOVAR {
     GATK4_BEDTOINTERVALLIST(ch_ref_bed, ch_ref_dict)
     ch_versions = ch_versions.mix(GATK4_BEDTOINTERVALLIST.out.versions)
 
+    // TODO: add simpler strategy that just splits bed file into 1 task per contig + add more meta data about contig name
+
     // Split chrom/contigs into separate interval_list files for scatter-gather parallel processing
     GATK4_INTERVALLISTTOOLS(GATK4_BEDTOINTERVALLIST.out.interval_list)
     ch_versions = ch_versions.mix(GATK4_INTERVALLISTTOOLS.out.versions)
     ch_intervals = GATK4_INTERVALLISTTOOLS.out.interval_list
+        // [ [interval_genome_meta.id], [interval_list, interval_list, ...] ] (single element)
+        .transpose()
+        // [ [interval_genome_meta.id], interval_list ] (multiple elements)
+
+    ch_bam_bai_intervals = ch_bam_bai
+        .combine(ch_intervals)
+        .map { bam_meta, bam, bai, interval_genome_meta, interval ->
+            def combined_meta = bam_meta + [
+                genome_id: interval_genome_meta.id,
+                interval_name: interval.simpleName
+            ]
+            [ combined_meta, bam, bai, interval ]
+        }
+        // [ [combined_meta.id, combined_meta.sample, combined_meta.num_entries, combined_meta.multiple_lanes, combined_meta.multiple_libraries, combined_meta.data_type, combined_meta.genome_id, combined_meta.interval_name], bam, bai, interval_list, [] ]
+
+    // TODO: check if bed or interval_list is preferred
 
     // Alternative approach to generate scattered interval
     // BIN_INTERVALS(ch_ref_bed, 1000000, [])
     // TODO sarek alternative approach: https://github.com/nf-core/sarek/blob/master/modules/local/create_intervals_bed/main.nf
     // https://github.com/nf-core/sarek/blob/master/subworkflows/local/prepare_intervals/main.nf
     // https://github.com/nf-core/sarek/blob/master/subworkflows/local/bam_variant_calling_haplotypecaller/main.nf
+
+    // Process each sample x interval combination in parallel with HaplotpeCaller
+    // Group GVCFs for all samples per interval for GenomicsDBImport
+    // Process each interval in parallel with GenotypeGVCFs
+    // Merge intervals
+
+    //
+    // Module: GATK4_HAPLOTYPECALLER (sample x interval)
+    // Call variants per sample per interval in parallel
+    //
+    GATK4_HAPLOTYPECALLER(
+        ch_bam_bai_intervals.map{ combined_meta, bam, bai, interval ->
+            [ combined_meta, bam, bai, interval, [] ] },
+        ch_ref_fasta,
+        ch_fai,
+        ch_ref_dict,
+        [[:], []],  // dbsnp (optional)
+        [[:], []]   // dbsnp_tbi (optional)
+    )
+    ch_versions = ch_versions.mix(GATK4_HAPLOTYPECALLER.out.versions)
+    ch_gvcf = GATK4_HAPLOTYPECALLER.out.vcf      // [[meta], vcf.gz]
+    ch_gvcf_tbi = GATK4_HAPLOTYPECALLER.out.tbi  // [[meta], tbi]
+
+    // Collect all samples for each interval for genomicsDBimport
+    ch_gvcf_by_interval = ch_gvcf
+        // [ [meta.id, meta.sample, meta.num_entries, meta.multiple_lanes, meta.multiple_libraries, meta.data_type, meta.genome_id, meta.interval_name], gvcf ]
+        .join(ch_gvcf_tbi, by: 0)                   // Join gvcf and tbi by meta
+        // [ meta, gvcf, tbi ]
+        .map { meta, gvcf, tbi ->
+            def interval_key = "${meta.genome_id}_${meta.interval_name}"
+            [ interval_key, meta, gvcf, tbi ]
+        }
+        // [interval_key, meta, gvcf, tbi]
+        .groupTuple(by: 0)                          // Group by interval
+        // [ interval_key, [meta, meta, ...], [gvcf, gvcf, ...], [tbi, tbi, ...] ]
+        .map { interval_key, metas, gvcfs, tbis ->
+            def interval_meta = [                   // Create new meta without sample info
+                id: interval_key,
+                genome_id: metas[0].genome_id,
+                interval_name: metas[0].interval_name
+            ]
+            [ interval_meta, gvcfs, tbis ]
+        }
+        // [ interval_meta, [gvcfs], [tbis] ]
+
+    // Rejoin with the actual interval file
+    ch_genomicsdb_input = ch_gvcf_by_interval   // [ interval_meta, [gvcfs], [tbis] ]           (1 per sample)
+        .combine(ch_intervals)                  // [ [interval_genome_meta.id], interval_list ] (1 per interval)
+        // [ interval_meta, [gvcfs], [tbis], [interval_genome_meta.id], interval_list]          (sample x interval)
+        .map { interval_meta, gvcfs, tbis, _interval_meta, interval_file ->
+            // Match by interval name
+            if (interval_file.simpleName == interval_meta.interval_name) {
+                return [ interval_meta, gvcfs, tbis, interval_file, [], []]
+            }
+        }
+        .filter { it != null }  // Remove non-matching combinations
+        // TODO: is this needed?
+
+    //
+    // Module: GATK4_GENOMICSDBIMPORT (intervals)
+    // Consolidate GVCFs per interval across all samples
+    //
+    GATK4_GENOMICSDBIMPORT(
+        ch_genomicsdb_input,
+        false,  // run_intlist
+        false,  // run_updatewspace
+        false   // input_map
+    )
+    ch_versions = ch_versions.mix(GATK4_GENOMICSDBIMPORT.out.versions)
+    ch_genomicsdb = GATK4_GENOMICSDBIMPORT.out.genomicsdb  // [[meta], genomicsdb_dir]
+
+    // Prepare channels for GenotypeGVCFs by matching genomicsdb with corresponding interval file
+    ch_genotype_input = ch_genomicsdb   // (1 per interval)
+        .combine(ch_intervals)          // (1 per interval)
+        // [ meta, genomicsdb_dir, interval_meta, interval_list ] (interval x genomicsb_interval_dirs => contains mismatched elements
+        .map { meta, genomicsdb, _interval_meta, interval_file ->
+            // Match by interval name
+            if (interval_file.simpleName == meta.interval_name) {
+                return [ meta, genomicsdb, [], interval_file, [] ]
+            }
+        }
+        .filter { it != null }
+
+    //
+    // Module: GATK4_GENOTYPEGVCFS (intervals)
+    // Perform joint genotyping per interval
+    //
+    GATK4_GENOTYPEGVCFS(
+        ch_genotype_input,
+        ch_ref_fasta,
+        ch_fai,
+        ch_ref_dict,
+        [[:], []],  // dbsnp (optional)
+        [[:], []]   // dbsnp_tbi (optional)
+    )
+    ch_versions = ch_versions.mix(GATK4_GENOTYPEGVCFS.out.versions)
+    ch_vcf_by_interval = GATK4_GENOTYPEGVCFS.out.vcf  // [[meta], vcf.gz]
+    ch_vcf_tbi_by_interval = GATK4_GENOTYPEGVCFS.out.tbi
+
+    // Prepare for VCF merging: collect all interval VCFs
+    // Group by genome_id to merge all intervals for that genome
+    ch_vcfs_to_merge = ch_vcf_by_interval
+        // [ meta, vcf ]    (1 per interval)
+        .join(ch_vcf_tbi_by_interval, by: 0)
+        // [ meta, vcf, tbi ]    (1 per interval)
+        .map { meta, vcf, tbi ->
+            [ meta.genome_id, vcf, tbi ]
+        }
+        .groupTuple(by: 0)
+        // [ meta.genome_id, [vcfs],  [tbis] ] (1 element with all interval files)
+        .map { genome_id, vcfs, tbis ->
+            def final_meta = [ id: genome_id ]
+            [ final_meta, vcfs ]
+        }
+
+    //
+    // Module: GATK4_MERGEVCFS
+    // Merge interval VCFs into single cohort VCF
+    // Order is handled automatically by the sequence dictionary
+    // (unlike bcftools, see https://nf-co.re/subworkflows/vcf_gather_bcftools)
+    //
+    GATK4_MERGEVCFS(
+        ch_vcfs_to_merge,
+        ch_ref_dict
+    )
+    ch_versions = ch_versions.mix(GATK4_MERGEVCFS.out.versions)
+    ch_final_vcf = GATK4_MERGEVCFS.out.vcf      // [[meta], merged.vcf.gz]
+    ch_final_vcf_tbi = GATK4_MERGEVCFS.out.tbi  // [[meta], merged.vcf.gz.tbi]
+
+    //
+    // Module: TABIX_TABIX
+    // Index the final merged VCF
+    //
+    // Or use bcftools? https://nf-co.re/modules/bcftools_index/
+    TABIX_TABIX(ch_final_vcf)
+    ch_final_vcf_tbi = TABIX_TABIX.out.index
+
 
     //
     // Collate and save software versions
