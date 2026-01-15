@@ -40,7 +40,336 @@
                     "type": "string",
                     "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
                     "fa_icon": "fas fa-file-signature"
+                },
+                "auto_detect_lanes": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to (attempt to) automatically extract the lane ID from from the input fastq filenames when this info is missing from the samplesheet. Searches for file patterns such as `_L001_`, `_L1_`, `.L01`, `_lane1_` or `_lane-01_`."
                 }
+
+            }
+        },
+        "reference_genome_options": {
+            "title": "Reference genome options",
+            "type": "object",
+            "fa_icon": "fas fa-dna",
+            "description": "Reference genome related files and options required for the workflow.",
+            "required": ["reference_fasta"],
+            "properties": {
+                "reference_fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to main reference genome in FASTA format.",
+                    "help_text": "This parameter is *mandatory*. If you don't have a BWA index available, this will be generated for you automatically. Combine with `--save_reference` to save BWA index for future runs.",
+                    "fa_icon": "fa-solid fa-book"
+                },
+                "reference_index": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Optional path to directory housing BWA index files.",
+                    "help_text": "Expected files are `*.{amb,.ann,.bwt,.pac,.sa}`. Files should have the same name as the main reference genome FASTA."
+                },
+                "save_reference": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to save the generated reference index files.",
+                    "fa_icon": "fas fa-download",
+                    "help_text": "Set to true to save all generated reference index files (BWA files for both main alignment and FastQScreen). These can be supplied to future runs via `--reference_index` and `TODO` to avoid unnecessary recomputation."
+                },
+                "reference_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.bed?(\\.gz)?$",
+                    "description": "Optional path to a BED file containing the genomic regions to restrict variant calling to.",
+                    "help_text": "If not supplied, all chromosomes/contigs regions defined in the fasta reference will be used. These will be grouped into a manageable number of interval_lists to avoid problems with highly fragmented genomes with many short contigs."
+                }
+            }
+        },
+        "skipping_options": {
+            "title": "Skipping options",
+            "type": "object",
+            "description": "Disable specific steps of the pipeline.",
+            "fa_icon": "fa-solid fa-forward-fast",
+            "properties": {
+                "skip_qc": {
+                    "type": "boolean",
+                    "description": "Skip QC steps.",
+                    "fa_icon": "fa-solid fa-forward-fast"
+                },
+                "skip_trimming": {
+                    "type": "boolean",
+                    "description": "Skip fastq trimming steps.",
+                    "fa_icon": "fa-solid fa-forward-fast"
+                },
+                "skip_hostremoval": {
+                    "type": "boolean",
+                    "description": "Skip removal of human reads.",
+                    "fa_icon": "fa-solid fa-forward-fast"
+                },
+                "skip_alignment": {
+                    "type": "boolean",
+                    "description": "Skip alignment steps.",
+                    "fa_icon": "fa-solid fa-forward-fast",
+                    "help_text": "Implies that variant calling will also be disabled."
+                },
+                "skip_variantcalling": {
+                    "type": "boolean",
+                    "description": "Skip variant calling steps.",
+                    "fa_icon": "fa-solid fa-forward-fast"
+                },
+                "only_build_reference": {
+                    "type": "boolean",
+                    "description": "Only build reference indices and exit.",
+                    "fa_icon": "fa-solid fa-forward-fast",
+                    "hidden": true
+                }
+            }
+        },
+        "fastq_trimming_options": {
+            "title": "Read trimming options for fastp",
+            "type": "object",
+            "description": "Configure fastq trimming options.",
+            "fa_icon": "fas fa-cut",
+            "properties": {
+                "fastp_save_trimmed": {
+                    "type": "boolean",
+                    "description": "Save trimmed FastQ files.",
+                    "fa_icon": "fas fa-download"
+                },
+                "fastp_save_merged": {
+                    "type": "boolean",
+                    "description": "Save merged paired-end reads.",
+                    "help_text": "See: https://github.com/OpenGene/fastp#merge-paired-end-reads",
+                    "fa_icon": "fas fa-download"
+                },
+                "fastp_adapter_fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to FASTA file containing adapter sequences for trimming.",
+                    "fa_icon": "fas fa-file"
+                },
+                "fastp_save_trimmed_fail": {
+                    "type": "boolean",
+                    "description": "Save reads that fail quality filters.",
+                    "help_text": "See: https://github.com/OpenGene/fastp?tab=readme-ov-file#store-the-reads-that-fail-the-filters",
+                    "fa_icon": "fas fa-download"
+                },
+                "fastp_qualified_quality_phred": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "The quality value that a base is qualified. Default 20 means phred quality >=Q20 is qualified.",
+                    "fa_icon": "fas fa-chart-line"
+                },
+                "fastp_unqualified_percent_limit": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "How many percents of bases are allowed to be unqualified (0~100).",
+                    "fa_icon": "fas fa-percent"
+                },
+                "fastp_length_required": {
+                    "type": "integer",
+                    "description": "Minimum length requirement for reads after trimming. Reads shorter than this will be discarded.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "fastp_cut_front": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable cutting by quality in the front (5' end).",
+                    "fa_icon": "fas fa-cut"
+                },
+                "fastp_cut_tail": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable cutting by quality in the tail (3' end).",
+                    "fa_icon": "fas fa-cut"
+                },
+                "fastp_disable_adapter_trimming": {
+                    "type": "boolean",
+                    "description": "Disable adapter trimming.",
+                    "fa_icon": "fas fa-ban"
+                },
+                "fastp_trim_poly_g": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable polyG tail trimming.",
+                    "help_text": "Enabled by default for NextSeq/NovaSeq data. See: https://github.com/OpenGene/fastp?tab=readme-ov-file#polyg-tail-trimming",
+                    "fa_icon": "fas fa-cut"
+                },
+                "fastp_extra_args": {
+                    "type": "string",
+                    "description": "Extra arguments to pass to fastp.",
+                    "fa_icon": "fas fa-plus"
+                }
+            }
+        },
+        "host_removal_options": {
+            "title": "Host read removal options",
+            "type": "object",
+            "description": "Configure human host read removal options.",
+            "fa_icon": "fas fa-filter",
+            "properties": {
+                "hostremoval_save_filtered": {
+                    "type": "boolean",
+                    "description": "Save filtered (host-removed) FastQ files.",
+                    "fa_icon": "fas fa-download"
+                },
+                "hostremoval_save_index": {
+                    "type": "boolean",
+                    "description": "Save generated host removal index files.",
+                    "fa_icon": "fas fa-download"
+                },
+                "hostremoval_method": {
+                    "type": "string",
+                    "default": "deacon",
+                    "description": "Method to use for host read removal.",
+                    "enum": ["deacon", "bbsplit"],
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Can be set to either `deacon` or `bbsplit`."
+                },
+                "hostremoval_reference": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to host reference genome FASTA for read removal.",
+                    "fa_icon": "fas fa-dna"
+                },
+                "hostremoval_bbsplit_index": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to BBSplit index directory for host removal.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "hostremoval_bbsplit_reference_name": {
+                    "type": "string",
+                    "default": "human",
+                    "description": "Reference name for BBSplit host removal.",
+                    "fa_icon": "fas fa-tag"
+                },
+                "hostremoval_bbsplit_ambiguous2": {
+                    "type": "string",
+                    "default": "all",
+                    "description": "BBSplit ambiguous2 parameter - how to handle ambiguous reads.",
+                    "fa_icon": "fas fa-question-circle"
+                },
+                "hostremoval_deacon_index": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to DEACON index directory for host removal.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "hostremoval_deacon_diff_fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to differential FASTA for DEACON host removal.",
+                    "fa_icon": "fas fa-file"
+                }
+            }
+        },
+        "alignment_options": {
+            "title": "Alignment options",
+            "type": "object",
+            "description": "Configure options for bwa alignment of (processed) reads against reference genome.",
+            "fa_icon": "fa-solid fa-align-center",
+            "properties": {
+                "save_bam": {
+                    "type": "boolean",
+                    "description": "Whether to save the initial BAM files.",
+                    "fa_icon": "fas fa-download",
+                    "help_text": "These are the initial BAM files generated by BWA, prior to merging or duplicate marking."
+                },
+                "save_bam_final": {
+                    "type": "boolean",
+                    "description": "Whether to save the final BAM files.",
+                    "fa_icon": "fas fa-download",
+                    "help_text": "These are the final BAM files generated by BWA, merged by sample (across lanes and libraries) and after duplicate marking."
+                }
+            }
+        },
+        "gatk_readgroup_options": {
+            "title": "GATK Read Group options",
+            "type": "object",
+            "description": "Set attributes for the GATK Read Groups.",
+            "fa_icon": "fas fa-filter",
+            "help_text": "The other fields are extracted automatically from the file name and fastq headers.",
+            "properties": {
+                "seq_center": {
+                    "type": "string",
+                    "description": "Sequencing center for GATK read group CN field.",
+                    "fa_icon": "fas fa-building"
+                },
+                "seq_platform": {
+                    "type": "string",
+                    "default": "ILLUMINA",
+                    "description": "Sequencing platform for GATK read group PL field.",
+                    "fa_icon": "fas fa-microscope"
+                }
+            }
+        },
+        "gatk_interval_options": {
+            "title": "GATK interval options",
+            "type": "object",
+            "description": "Configure intervals for scatter/gather parallelization of GATK.",
+            "fa_icon": "fas fa-th",
+            "properties": {
+                "scatter_count": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Maximum number of files into which to scatter the intervals for parallel processing.",
+                    "fa_icon": "fas fa-th"
+                }
+            }
+        },
+        "variant_calling": {
+            "title": "Variant calling",
+            "type": "object",
+            "description": "Configure GATK variant calling options",
+            "fa_icon": "fas fa-barcode",
+            "properties": {
+                "save_genomicsdb": {
+                    "type": "boolean",
+                    "description": "Save GenomicsDB workspace.",
+                    "fa_icon": "fas fa-download"
+                },
+                "save_intermediate_gvcf": {
+                    "type": "boolean",
+                    "description": "Save intermediate GVCF files from HaplotypeCaller.",
+                    "fa_icon": "fas fa-download"
+                },
+                "save_intermediate_vcf": {
+                    "type": "boolean",
+                    "description": "Save intermediate VCF files during variant calling.",
+                    "fa_icon": "fas fa-download"
+                }
+            }
+        },
+        "variant_filtering": {
+            "title": "Variant filtering",
+            "type": "object",
+            "description": "Configure variant filtering tools.",
+            "fa_icon": "fas fa-filter",
+            "properties": {
+            }
+        },
+        "annotation": {
+            "title": "Annotation",
+            "type": "object",
+            "description": "Configure snpEff for annotation of variants.",
+            "fa_icon": "fas fa-braille",
+            "properties": {
             }
         },
         "institutional_config_options": {
@@ -144,6 +473,8 @@
                 "multiqc_config": {
                     "type": "string",
                     "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
                     "description": "Custom config file to supply to MultiQC.",
                     "fa_icon": "fas fa-cog",
                     "hidden": true
@@ -197,6 +528,36 @@
     "allOf": [
         {
             "$ref": "#/$defs/input_output_options"
+        },
+        {
+            "$ref": "#/$defs/reference_genome_options"
+        },
+        {
+            "$ref": "#/$defs/skipping_options"
+        },
+        {
+            "$ref": "#/$defs/fastq_trimming_options"
+        },
+        {
+            "$ref": "#/$defs/host_removal_options"
+        },
+        {
+            "$ref": "#/$defs/alignment_options"
+        },
+        {
+            "$ref": "#/$defs/gatk_readgroup_options"
+        },
+        {
+            "$ref": "#/$defs/gatk_interval_options"
+        },
+        {
+            "$ref": "#/$defs/variant_calling"
+        },
+        {
+            "$ref": "#/$defs/variant_filtering"
+        },
+        {
+            "$ref": "#/$defs/annotation"
         },
         {
             "$ref": "#/$defs/institutional_config_options"
