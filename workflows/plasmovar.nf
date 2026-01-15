@@ -390,10 +390,7 @@ workflow PLASMOVAR {
         ch_reads_for_alignment = ch_reads_for_hostremoval
     }
 
-    //
-    // MODULE: Run bwa index
-    // Index reference genome if index is not already provided
-    //
+    // Prepare reference genome and associated files
 
     // Create channel containing the reference fasta
     // ch_ref_fasta = channel.fromPath(params.reference_fasta)
@@ -405,6 +402,39 @@ workflow PLASMOVAR {
         [ id: ref_basename ],
         ref
     ])
+
+    // Index reference fasta as .fai
+    SAMTOOLS_FAIDX(
+        ch_ref_fasta,
+        [[:], []],
+        []
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
+    ch_fai      = SAMTOOLS_FAIDX.out.fai    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai]
+
+    // Create or read bed file
+    if (params.reference_bed) {
+        bed_file = file(params.reference_bed, checkIfExists: true)
+        ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
+    } else {
+        CREATE_INTERVALS_BED(ch_fai)
+        ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
+        ch_ref_bed = CREATE_INTERVALS_BED.out.bed   // [[id:PlasmoDB-68_Pfalciparum3D7_Genome], /path/to/work/e6/dd568ffd9b39576d3677b1518aa507/PlasmoDB-68_Pfalciparum3D7_Genome.bed]
+        // TODO: prepare intervals alternative method to bin regions
+        // https://nf-co.re/modules/gatk4_preprocessintervals/
+        // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
+        // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
+        // TODO add option to supply custom bed file (e.g. ampliseq)
+    }
+
+    // TODO: sort bed file? https://bedtools.readthedocs.io/en/latest/content/tools/sort.html unix sort should be faster. Where is sorting important? Is it the order within regions or all regions as they appear in the fasta?
+
+    //
+    // MODULE: Run bwa index
+    // Index reference genome if index is not already provided
+    //
+
+    // TODO: move into subworkflow
 
     if (!params.reference_index) {
         // Construct bwa index for the reference fasta if it is not supplied by the user
@@ -524,43 +554,34 @@ workflow PLASMOVAR {
         )
         ch_bam = BWA_MEM.out.bam
         ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
-    }
+
     // TODO: optionally enable CRAM output
 
     // TODO: when to combine runs/lanes from the same sample/library? how can stalling be avoided?
     // old sarek approach: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L272
     // new sarek approach: https://github.com/nf-core/sarek/blob/20f41d1ce8b7ba296ee22adc71fe2da2ebcae93f/subworkflows/local/fastq_preprocess_gatk/main.nf#L163
 
-    //
-    // MODULE: Run picard markduplicates
-    // Mark duplicates using Picard and merge reads derived from same sample using RG values
-    //
+        //
+        // MODULE: Run picard markduplicates
+        // Mark duplicates using Picard and merge reads derived from same sample using RG values
+        //
 
-    // Index reference fasta as .fai
-    SAMTOOLS_FAIDX(
-        ch_ref_fasta,
-        [[:], []],
-        []
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
-    ch_fai      = SAMTOOLS_FAIDX.out.fai    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai]
+        // Group multi-lane/library samples by creating tuple with sample as grouping key
+        ch_bam_grouped = ch_bam
+            // remove unique distinguishing fields in meta data per sample
+            .map { meta, bam ->
+                [ meta - meta.subMap('id', 'read_group', 'single_end') + [ data_type: 'bam' ], bam ]
+            }
+            .groupTuple()
+            .map { meta, bam -> [ [ id: meta.sample ] +  meta, bam ] }  // add new (sample-level) id
 
-    // Group multi-lane/library samples by creating tuple with sample as grouping key
-    ch_bam_grouped = ch_bam
-        // remove unique distinguishing fields in meta data per sample
-        .map { meta, bam ->
-            [ meta - meta.subMap('id', 'read_group', 'single_end') + [ data_type: 'bam' ], bam ]
-        }
-        .groupTuple()
-        .map { meta, bam -> [ [ id: meta.sample ] +  meta, bam ] }  // add new (sample-level) id
-
-    GATK4_MARKDUPLICATES(
-        ch_bam_grouped,
-        ch_ref_fasta.map{ _meta, fasta -> [ fasta ] }.first(),
-        ch_fai.map{ _meta, fai -> fai }.first()
-    )
-    ch_versions = ch_versions.mix(GATK4_MARKDUPLICATES.out.versions)
-    ch_bam_markdup = GATK4_MARKDUPLICATES.out.bam
+        GATK4_MARKDUPLICATES(
+            ch_bam_grouped,
+            ch_ref_fasta.map{ _meta, fasta -> [ fasta ] }.first(),
+            ch_fai.map{ _meta, fai -> fai }.first()
+        )
+        ch_versions = ch_versions.mix(GATK4_MARKDUPLICATES.out.versions)
+        ch_bam_markdup = GATK4_MARKDUPLICATES.out.bam
 
     // TODO: picard module could be an alternative, but it can only process 1 sample at a time
     // i.e. it does not merge samples while taking into account read groups.
@@ -586,41 +607,28 @@ workflow PLASMOVAR {
 
     // TODO: move into subworkflow?
 
-    SAMTOOLS_SORT_MARKDUP(ch_bam_markdup, ch_ref_fasta, 'bai')
-    ch_bam_markdup_sort = SAMTOOLS_SORT_MARKDUP.out.bam
+        SAMTOOLS_SORT_MARKDUP(ch_bam_markdup, ch_ref_fasta, 'bai')
+        ch_bam_markdup_sort = SAMTOOLS_SORT_MARKDUP.out.bam
 
-    SAMTOOLS_INDEX(ch_bam_markdup_sort)
-    ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first())
-    ch_bam_bai = ch_bam_markdup_sort.join(SAMTOOLS_INDEX.out.bai)
+        SAMTOOLS_INDEX(ch_bam_markdup_sort)
+        ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first())
+        ch_bam_bai = ch_bam_markdup_sort.join(SAMTOOLS_INDEX.out.bai)
 
-    SAMTOOLS_STATS(ch_bam_bai, ch_ref_fasta)
-    SAMTOOLS_FLAGSTAT(ch_bam_bai)
-    ch_versions = ch_versions.mix(SAMTOOLS_FLAGSTAT.out.versions)
-    SAMTOOLS_IDXSTATS(ch_bam_bai)
-    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions)
+        SAMTOOLS_STATS(ch_bam_bai, ch_ref_fasta)
+        SAMTOOLS_FLAGSTAT(ch_bam_bai)
+        ch_versions = ch_versions.mix(SAMTOOLS_FLAGSTAT.out.versions)
+        SAMTOOLS_IDXSTATS(ch_bam_bai)
+        ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions)
 
-    //
-    // Module: mosdepth coverage statistics
-    //
+        //
+        // Module: mosdepth coverage statistics
+        //
 
-    if (params.reference_bed) {
-        bed_file = file(params.reference_bed, checkIfExists: true)
-        ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
-    } else {
-        CREATE_INTERVALS_BED(ch_fai)
-        ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
-        ch_ref_bed = CREATE_INTERVALS_BED.out.bed   // [[id:PlasmoDB-68_Pfalciparum3D7_Genome], /path/to/work/e6/dd568ffd9b39576d3677b1518aa507/PlasmoDB-68_Pfalciparum3D7_Genome.bed]
-        // TODO: prepare intervals alternative method to bin regions
-        // https://nf-co.re/modules/gatk4_preprocessintervals/
-        // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
-        // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
-        // TODO add option to supply custom bed file (e.g. ampliseq)
+        ch_bam_bai_bed = ch_bam_bai.combine(ch_ref_bed.map { _meta, bed -> bed })
+        MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta)
     }
 
-    ch_bam_bai_bed = ch_bam_bai.combine(ch_ref_bed.map { _meta, bed -> bed })
-    MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta)
-
-    if (!params.skip_variantcalling) {
+    if (!params.skip_variantcalling && !params.skip_alignment) {
 
         //
         // Prepare intervals for scatter-gather processing in GATK
