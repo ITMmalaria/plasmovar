@@ -162,9 +162,9 @@ workflow PLASMOVAR {
 
     // TODO create channel holding reference genome
     // Note: bwa_index expects meta channel, whereas bbsplit_indexer just needs a path
-    // ch_reference = channel.value(file(params.reference))
-    // ch_reference = channel.fromPath(params.reference).map{ref -> tuple (ref.simpleName, ref)}
-    // reference = [[ id:'reference', primary:true ], file(params.reference)]
+    // ch_reference = channel.value(file(params.reference_fasta))
+    // ch_reference = channel.fromPath(params.reference_fasta).map{ref -> tuple (ref.simpleName, ref)}
+    // reference = [[ id:'reference', primary:true ], file(params.reference_fasta)]
 
 
 
@@ -285,7 +285,7 @@ workflow PLASMOVAR {
                 BBMAP_BBSPLIT_INDEXER (
                     [ [:], [] ],
                     [],
-                    channel.value(file(params.reference, checkIfExists: true)),
+                    channel.value(file(params.reference_fasta, checkIfExists: true)),
                     ch_bbsplit_other_refs,
                     true
                 )
@@ -396,10 +396,10 @@ workflow PLASMOVAR {
     //
 
     // Create channel containing the reference fasta
-    // ch_ref_fasta = channel.fromPath(params.reference)
+    // ch_ref_fasta = channel.fromPath(params.reference_fasta)
     //     .map { ref -> tuple([ id: ref.simpleName ], ref) }
     //     .collect()   // or .first()
-    def ref = file(params.reference, checkIfExists: true)
+    def ref = file(params.reference_fasta, checkIfExists: true)
     def ref_basename = ref.simpleName
     ch_ref_fasta = channel.value([
         [ id: ref_basename ],
@@ -502,11 +502,11 @@ workflow PLASMOVAR {
         // Alternative option using channel.of, requires collect() to create value channel
         // ch_bwa_index = channel.of(
         //     tuple(
-        //         [ id: file(params.reference).simpleName ],
+        //         [ id: file(params.reference_fasta).simpleName ],
         //         file(params.reference_index, checkIfExists: true)
         //     )
         // ).collect()
-        // ch_bwa_index = channel.fromPath(params.reference)
+        // ch_bwa_index = channel.fromPath(params.reference_fasta)
         //     .map( { ref ->  tuple([ id: ref.simpleName ], file(params.reference_index, checkIfExists: true)) } )
     }
 
@@ -604,7 +604,8 @@ workflow PLASMOVAR {
     //
 
     if (params.intervals_bed) {
-        bed_file = file(params.reference, checkIfExists: true)
+        bed_file = file(params.reference_fasta, checkIfExists: true)
+        // TODO: fix -> should be reference_bed option
         ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
     } else {
         CREATE_INTERVALS_BED(ch_fai)
