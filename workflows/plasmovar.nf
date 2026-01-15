@@ -603,9 +603,8 @@ workflow PLASMOVAR {
     // Module: mosdepth coverage statistics
     //
 
-    if (params.intervals_bed) {
-        bed_file = file(params.reference_fasta, checkIfExists: true)
-        // TODO: fix -> should be reference_bed option
+    if (params.reference_bed) {
+        bed_file = file(params.reference_bed, checkIfExists: true)
         ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
     } else {
         CREATE_INTERVALS_BED(ch_fai)
