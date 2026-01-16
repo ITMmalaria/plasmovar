@@ -40,6 +40,7 @@ include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk
 include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk4/genotypegvcfs/main'
 include { GATK4_MERGEVCFS                        } from '../modules/nf-core/gatk4/mergevcfs/main'
 include { TABIX_TABIX                            } from '../modules/nf-core/tabix/tabix/main'
+include { SNPEFF_BUILD                           } from '../modules/local/snpeff/build/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -812,6 +813,23 @@ workflow PLASMOVAR {
     }
 
 
+    //
+    // Module: snpEff annotation
+    //
+
+    ch_snpeff_input = ch_ref_fasta
+        .combine(channel.value(file(params.reference_annotation, checkIfExists: true)))
+        .combine(channel.value(file(params.reference_cds, checkIfExists: true)))
+
+    SNPEFF_BUILD(
+        ch_snpeff_input,
+        ch_ref_fasta.map { meta, fasta -> meta.id },
+        params.annotation_format ? params.annotation_format : '',
+        ch_ref_bed,
+        channel.fromPath("$projectDir/assets/snpEff.config", checkIfExists: true)
+        )
+
+    ch_snpeff_database = SNPEFF_BUILD.out.db
 
     //
     // Collate and save software versions

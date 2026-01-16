@@ -365,11 +365,37 @@
             }
         },
         "annotation": {
-            "title": "Annotation",
+            "title": "Annotation options",
             "type": "object",
             "description": "Configure snpEff for annotation of variants.",
             "fa_icon": "fas fa-braille",
             "properties": {
+                "reference_annotation": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.(gff3?|gtf)(\\.gz)?$",
+                    "description": "Path to gene annotation file (gff3/gtf) used for building the snpEff database.",
+                    "errorMessage": "Input must be a .gff, .gff3, or .gtf file (optionally gzipped).",
+                    "fa_icon": "fas fa-file"
+                },
+                "reference_cds": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to CDS FASTA file to use as a check during the snpEff database building step.",
+                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
+                    "fa_icon": "fas fa-file"
+                },
+                "annotation_format": {
+                    "type": "string",
+                    "description": "Save intermediate VCF files during variant calling.",
+                    "enum": ["gff", "gtf", ""],
+                    "help": "When omitted, the file type will be detected automatically from the file extension (if it is set correctly)."
+                }
             }
         },
         "institutional_config_options": {
