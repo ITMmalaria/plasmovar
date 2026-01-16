@@ -399,9 +399,15 @@
                 },
                 "annotation_format": {
                     "type": "string",
-                    "description": "Save intermediate VCF files during variant calling.",
-                    "enum": ["gff", "gtf", ""],
+                    "description": "Type of annotation file (gff or gtf).",
+                    "enum": ["gff", "gff3", "gtf"],
                     "help": "When omitted, the file type will be detected automatically from the file extension (if it is set correctly)."
+                },
+                "save_snpeff_db": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Save intermediate VCF files during variant calling.",
+                    "fa_icon": "fas fa-download"
                 }
             }
         },

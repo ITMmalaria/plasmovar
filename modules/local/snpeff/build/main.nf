@@ -37,8 +37,8 @@ process SNPEFF_BUILD {
                 "Please provide annotation_format parameter ('gtf' or 'gff')."
         }
     }
-    if (annotation_format != 'gtf' && annotation_format != 'gff') {
-        error "Invalid annotation_format: '${annotation_format}'. Must be 'gtf' or 'gff'."
+    if (annotation_format != 'gtf' && annotation_format != 'gff' && annotation_format != 'gff3' ) {
+        error "Invalid annotation_format: '${annotation_format}'. Must be 'gtf' or 'gff(3)'."
     }
     def annotation_file = (annotation_format == 'gtf') ? 'genes.gtf' : 'genes.gff'
     def annotation_arg = (annotation_format == 'gtf') ? '-gtf22' : '-gff3'
