@@ -16,14 +16,14 @@
             "lane": {
                 "type": ["string", "integer", "null"],
                 "pattern": "^L?\\d{1,3}$",
-                "errorMessage": "Lane number must be provided (if samples are split across lanes) and cannot contain spaces",
+                "errorMessage": "Lane number must be provided if samples are split across lanes and cannot be distinguished. Lane identifier cannot contain spaces",
                 "meta": ["lane"],
                 "default": null
             },
             "library": {
                 "type": ["string", "integer", "null"],
                 "pattern": "^\\S+$",
-                "errorMessage": "Optional identifier to distinguish libraries derived from the same sample",
+                "errorMessage": "Library identifier is required to distinguish samples with the same name (and potentially lane) if different libraries were sequenced.",
                 "meta": ["library"],
                 "default": null
             },

@@ -21,6 +21,7 @@
                     "pattern": "^\\S+\\.csv$",
                     "description": "Path to comma-separated file containing information about the samples in the experiment.",
                     "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row.",
+                    "errorMessage": "Input must be a .csv file.",
                     "fa_icon": "fas fa-file-csv"
                 },
                 "outdir": {
@@ -64,6 +65,7 @@
                     "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
                     "description": "Path to main reference genome in FASTA format.",
                     "help_text": "This parameter is *mandatory*. If you don't have a BWA index available, this will be generated for you automatically. Combine with `--save_reference` to save BWA index for future runs.",
+                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
                     "fa_icon": "fa-solid fa-book"
                 },
                 "reference_index": {
@@ -87,7 +89,9 @@
                     "mimetype": "text/plain",
                     "pattern": "^\\S+\\.bed?(\\.gz)?$",
                     "description": "Optional path to a BED file containing the genomic regions to restrict variant calling to.",
-                    "help_text": "If not supplied, all chromosomes/contigs regions defined in the fasta reference will be used. These will be grouped into a manageable number of interval_lists to avoid problems with highly fragmented genomes with many short contigs."
+                    "help_text": "If not supplied, all chromosomes/contigs regions defined in the fasta reference will be used. These will be grouped into a manageable number of interval_lists to avoid problems with highly fragmented genomes with many short contigs.",
+                    "errorMessage": "Input must be a .bed file (optionally gzipped).",
+                    "fa_icon": "fa-solid fa-book"
                 }
             }
         },
@@ -155,6 +159,7 @@
                     "mimetype": "text/plain",
                     "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
                     "description": "Path to FASTA file containing adapter sequences for trimming.",
+                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
                     "fa_icon": "fas fa-file"
                 },
                 "fastp_save_trimmed_fail": {
@@ -242,6 +247,7 @@
                     "mimetype": "text/plain",
                     "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
                     "description": "Path to host reference genome FASTA for read removal.",
+                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
                     "fa_icon": "fas fa-dna"
                 },
                 "hostremoval_bbsplit_index": {
@@ -275,7 +281,8 @@
                     "mimetype": "text/plain",
                     "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
                     "description": "Path to differential FASTA for DEACON host removal.",
-                    "fa_icon": "fas fa-file"
+                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
+                    "fa_icon": "fa-solid fa-book"
                 }
             }
         },
@@ -322,7 +329,7 @@
         "gatk_interval_options": {
             "title": "GATK interval options",
             "type": "object",
-            "description": "Configure intervals for scatter/gather parallelization of GATK.",
+            "description": "Configure intervals of genomic regions for scatter/gather parallelization of GATK.",
             "fa_icon": "fas fa-th",
             "properties": {
                 "scatter_count": {
@@ -334,7 +341,7 @@
             }
         },
         "variant_calling": {
-            "title": "Variant calling",
+            "title": "Variant calling options",
             "type": "object",
             "description": "Configure GATK variant calling options",
             "fa_icon": "fas fa-barcode",
@@ -357,7 +364,7 @@
             }
         },
         "variant_filtering": {
-            "title": "Variant filtering",
+            "title": "Variant filtering options",
             "type": "object",
             "description": "Configure variant filtering tools.",
             "fa_icon": "fas fa-filter",
