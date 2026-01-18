@@ -817,18 +817,23 @@ workflow PLASMOVAR {
     // Module: snpEff annotation
     //
 
-    ch_snpeff_input = ch_ref_fasta
-        .combine(channel.value(file(params.reference_annotation, checkIfExists: true)))
-        .combine(channel.value(file(params.reference_cds, checkIfExists: true)))
+    ch_snpeff_input = ch_ref_fasta.map { meta_ref, fasta ->
+        tuple(
+            meta_ref,
+            fasta,
+            file(params.reference_annotation, checkIfExists: true),
+            params.reference_cds ? file(params.reference_cds, checkIfExists: true) : [],
+            params.reference_protein ? file(params.reference_protein) : [],
+        )
+    }
 
     SNPEFF_BUILD(
         ch_snpeff_input,
-        ch_ref_fasta.map { meta, fasta -> meta.id },
-        params.annotation_format ? params.annotation_format : '',
+        params.annotation_format ?: '',
         ch_ref_bed,
-        channel.fromPath("$projectDir/assets/snpEff.config", checkIfExists: true)
+        channel.fromPath("$projectDir/assets/snpEff.config", checkIfExists: true),
+        ch_ref_fasta.map { meta, _fasta -> meta.id },
         )
-
     ch_snpeff_database = SNPEFF_BUILD.out.db
 
     //

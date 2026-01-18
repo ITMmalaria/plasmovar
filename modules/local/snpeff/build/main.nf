@@ -8,14 +8,18 @@ process SNPEFF_BUILD {
         : 'community.wave.seqera.io/library/snpeff:5.4.0a--eaf6ce30125b2b17'}"
 
     input:
-    tuple val(meta_ref), path(fasta), path(annotation), path(cds)
-    val db_name
+    tuple val(meta_ref), path(fasta), path(annotation), path(cds), path(protein)    // cds and protein are optional
+    // TODO: use , arity: '0..*' or typed inputs? See https://github.com/nextflow-io/nextflow/issues/5111 & https://github.com/nextflow-io/nextflow/issues/1694
+    // TODO: use stageAs to change name immediately without relying on the bash script to do it
     val annotation_format           // 'gff', 'gtf' or empty (falls back to detection in filename)
     tuple val(meta_bed), path(bed)  // BED file for mitochondrial/apicoplast detection
     path snpeff_config_template
+    val db_name
 
     output:
     tuple val(meta_ref), path("snpeff_db"), emit: db
+    // tuple val(meta_ref), path("snpeff_db/data"),            emit: db // TODO: emit db separately and use absolute path for workdir in annotation step?   // TODO: check if cli workdir argument overrides workdir in template
+    // tuple val(meta_ref), path("snpeff_db/snpEff.config"),   emit: config
     tuple val("${task.process}"), val('snpeff'), eval("snpEff -version 2>&1 | cut -f 2 -d '\t'"), topic: versions, emit: versions_snpeff
 
     when:
@@ -23,6 +27,9 @@ process SNPEFF_BUILD {
 
     script:
     def args = task.ext.args ?: ''
+
+    // set db_name to meta.id of reference when not supplied
+    db_name = db_name ?: meta_ref.id
 
     // extract gff/gtf format from filename if not provided
     if (!annotation_format) {
@@ -42,28 +49,54 @@ process SNPEFF_BUILD {
     }
     def annotation_file = (annotation_format == 'gtf') ? 'genes.gtf' : 'genes.gff'
     def annotation_arg = (annotation_format == 'gtf') ? '-gtf22' : '-gff3'
+
+    // add cli arguments to skip checks for cds/protein files when they are not provided
+    def no_check_cds_arg = cds ? '' : '-noCheckCds'
+    def no_check_protein_arg = protein ? '' : '-noCheckProtein'
+
     """
     # Create the directory structure snpEff expects
     mkdir -p snpeff_db/data/${db_name}
 
     # Copy and rename files to match snpEff naming requirements, unzipping them if necessary
-    if [[ ${fasta} == *.gz ]]; then
+    if [[ "${fasta}" == *.gz ]]; then
         gunzip -c ${fasta} > snpeff_db/data/${db_name}/sequences.fa
     else
         cp ${fasta} snpeff_db/data/${db_name}/sequences.fa
     fi
-    if [[ ${annotation} == *.gz ]]; then
+
+    if [[ "${annotation}" == *.gz ]]; then
         gunzip -c ${annotation} > snpeff_db/data/${db_name}/${annotation_file}
     else
         cp ${annotation} snpeff_db/data/${db_name}/${annotation_file}
     fi
-    if [[ ${cds} == *.gz ]]; then
-        gunzip -c ${cds} > snpeff_db/data/${db_name}/cds.fa
+
+    # Only copy CDS and proteins files if provided
+    # Note: quotes around variables during file existence check are critical,
+    # otherwise the tests will default to true when the variable is an empty string
+    # `if [ -f \$undeclared_var ]` = `if [ -f ]` = true
+    if [ -f "${cds}" ]; then
+        if [[ "${cds}" == *.gz ]]; then
+            gunzip -c ${cds} > snpeff_db/data/${db_name}/cds.fa
+        else
+            cp ${cds} snpeff_db/data/${db_name}/cds.fa
+        fi
     else
-        cp ${cds} snpeff_db/data/${db_name}/cds.fa
+        echo "No CDS file provided, skipping CDS check."
+    fi
+
+    if [ -f "${protein}" ]; then
+        if [[ "${protein}" == *.gz ]]; then
+            gunzip -c ${protein} > snpeff_db/data/${db_name}/protein.fa
+        else
+            cp "${protein}" "snpeff_db/data/${db_name}/protein.fa"
+        fi
+    else
+        echo "No protein file provided, skipping protein check."
     fi
 
     # Create snpEff config file, starting with the template file
+    # Note: dataDir in config file will be ignored since it is overridden by the CLI option
     cp ${snpeff_config_template} snpeff_db/snpEff.config
 
     # Append custom genome configuration to config
@@ -91,13 +124,14 @@ EOF
         done
     fi
 
-    # Build the database - dataDir is relative to the location of snpEff.config
+    # Build the database - dataDir is relative to the location of snpEff.config when provided as a relative path
     snpEff build \\
-        -c snpeff_db/snpEff.config \\
-        ${annotation_arg} \\
         -v \\
-        -noCheckProtein \\
+        -c snpeff_db/snpEff.config \\
         -dataDir ./data/ \\
+        ${annotation_arg} \\
+        ${no_check_cds_arg} \\
+        ${no_check_protein_arg} \\
         ${args} \\
         ${db_name}
     """
@@ -115,3 +149,5 @@ EOF
     touch versions.yml
     """
 }
+
+// TODO: dataDir can be made into an absolute path -> will allow passing separately to snpEff ann module?

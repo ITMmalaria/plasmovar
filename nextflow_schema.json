@@ -411,6 +411,16 @@
                     "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
                     "fa_icon": "fas fa-file"
                 },
+                "reference_protein": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to protein FASTA file to use as a check during the snpEff database building step.",
+                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
+                    "fa_icon": "fas fa-file"
+                },
                 "annotation_format": {
                     "type": "string",
                     "description": "Type of annotation file (gff or gtf).",
