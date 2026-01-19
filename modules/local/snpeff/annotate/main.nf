@@ -9,8 +9,10 @@ process SNPEFF_ANNOTATE {
 
     input:
     tuple val(meta), path(vcf)
-    tuple val(db_meta), path(snpeff_db) // The entire snpeff_db folder from SNPEFF_BUILD
-    val db_name                         // Optional name of the snpEff database, defaults to db_meta.id
+    tuple val(db_meta), path(snpeff_db)
+    tuple val(config_meta), path(snpeff_config)
+    // tuple val(db_meta), path(snpeff_db) // The entire snpeff_db folder from SNPEFF_BUILD
+    val db_name                         // Optional name of the snpEff genome database, defaults to db_meta.id
     // TODO optional db-path? as value/string to make it relative to snpEff.config or absolute path?
     // TODO: add interval filter -fi , -filterInterval  <file>   : Only analyze changes that intersect with the intervals specified in this file (you may use this option many times)
 
@@ -47,12 +49,12 @@ process SNPEFF_ANNOTATE {
     # NOTE: we cannot rely on the snpEff databases command because it only seems to search online
     # and defaults to looking for hg19/hg19.genome.
 
-    # NOTE: dataDir is relative to snpEff.config when provided as a relative path
+    # NOTE: dataDir is relative to snpEff.config when provided as a relative path. Depends on whether or not self-contained database dir + config is passed as input (relative path) or if they are provided separately (absolute path)
     snpEff ann \\
         -Xmx${avail_mem}M \\
         -v \\
-        -config ${snpeff_db}/snpEff.config \\
-        -dataDir ./data \\
+        -config ${snpeff_config} \\
+        -dataDir ${snpeff_db} \\
         -csvStats ${prefix}.csv \\
         -stats ${prefix}.html \\
         ${args} \\

@@ -17,9 +17,9 @@ process SNPEFF_BUILD {
     val db_name
 
     output:
-    tuple val(meta_ref), path("snpeff_db"), emit: db
-    // tuple val(meta_ref), path("snpeff_db/data"),            emit: db // TODO: emit db separately and use absolute path for workdir in annotation step?   // TODO: check if cli workdir argument overrides workdir in template
-    // tuple val(meta_ref), path("snpeff_db/snpEff.config"),   emit: config
+    // tuple val(meta_ref), path("snpeff_db"), emit: db   // Alternative approach: output self-contained directory with snpEff config and database, requires the use of relative -dataDir option in snpEff annotate command
+    tuple val(meta_ref), path("snpeff_db/data"),            emit: db
+    tuple val(meta_ref), path("snpeff_db/snpEff.config"),   emit: config
     tuple val("${task.process}"), val('snpeff'), eval("snpEff -version 2>&1 | cut -f 2 -d '\t'"), topic: versions, emit: versions_snpeff
 
     when:
@@ -149,5 +149,3 @@ EOF
     touch versions.yml
     """
 }
-
-// TODO: dataDir can be made into an absolute path -> will allow passing separately to snpEff ann module?

@@ -835,13 +835,12 @@ workflow PLASMOVAR {
         channel.fromPath("$projectDir/assets/snpEff.config", checkIfExists: true),
         ch_ref_fasta.map { meta, _fasta -> meta.id },
         )
-    ch_snpeff_database = SNPEFF_BUILD.out.db
 
     SNPEFF_ANNOTATE(
         ch_final_vcf,
-        ch_snpeff_database,
+        SNPEFF_BUILD.out.db,
+        SNPEFF_BUILD.out.config,
         ch_ref_fasta.map { meta, _fasta -> meta.id }
-        // 'PlasmoDB-68_Pfalciparum3D7_Genome'
     )
 
     //
