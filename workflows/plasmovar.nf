@@ -41,6 +41,7 @@ include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk
 include { GATK4_MERGEVCFS                        } from '../modules/nf-core/gatk4/mergevcfs/main'
 include { TABIX_TABIX                            } from '../modules/nf-core/tabix/tabix/main'
 include { SNPEFF_BUILD                           } from '../modules/local/snpeff/build/main'
+include { SNPEFF_ANNOTATE                        } from '../modules/local/snpeff/annotate/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -835,6 +836,13 @@ workflow PLASMOVAR {
         ch_ref_fasta.map { meta, _fasta -> meta.id },
         )
     ch_snpeff_database = SNPEFF_BUILD.out.db
+
+    SNPEFF_ANNOTATE(
+        ch_final_vcf,
+        ch_snpeff_database,
+        ch_ref_fasta.map { meta, _fasta -> meta.id }
+        // 'PlasmoDB-68_Pfalciparum3D7_Genome'
+    )
 
     //
     // Collate and save software versions
