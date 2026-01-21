@@ -13,6 +13,8 @@
 */
 
 include { FASTQC                                 } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_TRIMMED               } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_DECONTAMINATED        } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                                } from '../modules/nf-core/multiqc/main'
 include { FASTP                                  } from '../modules/nf-core/fastp/main'
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_INDEXER } from '../modules/nf-core/bbmap/bbsplit/main'
@@ -248,6 +250,10 @@ workflow PLASMOVAR {
         ch_versions = ch_versions.mix(FASTP.out.versions.first())
         ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
     // TODO: re-run fastQC after fastp, or just rely on subworkflow mentioned above
+        if (!params.skip_qc) {
+            FASTQC_TRIMMED(ch_reads_for_hostremoval)
+            ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED.out.zip.collect{it[1]})
+        }
     } else {
         ch_reads_for_hostremoval = ch_samplesheet
     }
@@ -386,6 +392,11 @@ workflow PLASMOVAR {
             DEACON_FILTER(ch_deacon_input)
             ch_reads_for_alignment = DEACON_FILTER.out.fastq_filtered
             ch_versions = ch_versions.mix(DEACON_FILTER.out.versions.first())
+        }
+
+        if (!params.skip_qc) {
+            FASTQC_DECONTAMINATED(ch_reads_for_alignment)
+            ch_multiqc_files = ch_multiqc_files.mix(FASTQC_DECONTAMINATED.out.zip.collect{it[1]})
         }
     } else {
         // skip host removal and continue unmodified read channel for alignment
