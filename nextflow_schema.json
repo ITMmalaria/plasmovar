@@ -286,15 +286,10 @@
                     "description": "Path to DEACON index directory for host removal.",
                     "fa_icon": "fas fa-folder"
                 },
-                "hostremoval_deacon_diff_fasta": {
-                    "type": "string",
-                    "format": "file-path",
-                    "exists": true,
-                    "mimetype": "text/plain",
-                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
-                    "description": "Path to differential FASTA for DEACON host removal.",
-                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
-                    "fa_icon": "fa-solid fa-book"
+                "hostremoval_deacon_diff": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to subtract the main reference genome index from the host filter index."
                 }
             }
         },

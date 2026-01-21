@@ -200,11 +200,51 @@ workflow PLASMOVAR {
         ch_samplesheet = ch_samplesheet.map { meta, fastqs -> addReadgroupToMeta(meta, fastqs) }
     }
 
-    if (!params.skip_qc) {
 
-        //
-        // MODULE: Run FastQC
-        //
+    // Prepare reference genome and associated files
+
+    // Create channel containing the reference fasta
+    // ch_ref_fasta = channel.fromPath(params.reference_fasta)
+    //     .map { ref -> tuple([ id: ref.simpleName ], ref) }
+    //     .collect()   // or .first()
+    def ref = file(params.reference_fasta, checkIfExists: true)
+    def ref_basename = ref.simpleName
+    ch_ref_fasta = channel.value([
+        [ id: ref_basename ],
+        ref
+    ])
+
+    // Index reference fasta as .fai
+    SAMTOOLS_FAIDX(
+        ch_ref_fasta,
+        [[:], []],
+        []
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
+    ch_fai      = SAMTOOLS_FAIDX.out.fai    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai]
+
+    // Create or read bed file
+    if (params.reference_bed) {
+        bed_file = file(params.reference_bed, checkIfExists: true)
+        ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
+    } else {
+        CREATE_INTERVALS_BED(ch_fai)
+        ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
+        ch_ref_bed = CREATE_INTERVALS_BED.out.bed   // [[id:PlasmoDB-68_Pfalciparum3D7_Genome], /path/to/work/e6/dd568ffd9b39576d3677b1518aa507/PlasmoDB-68_Pfalciparum3D7_Genome.bed]
+        // TODO: prepare intervals alternative method to bin regions
+        // https://nf-co.re/modules/gatk4_preprocessintervals/
+        // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
+        // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
+        // TODO add option to supply custom bed file (e.g. ampliseq)
+    }
+
+    // TODO: sort bed file? https://bedtools.readthedocs.io/en/latest/content/tools/sort.html unix sort should be faster. Where is sorting important? Is it the order within regions or all regions as they appear in the fasta?
+
+    //
+    // MODULE: Run FastQC
+    //
+
+    if (!params.skip_qc) {
         FASTQC (
             ch_samplesheet
         )
@@ -326,8 +366,7 @@ workflow PLASMOVAR {
 
             // create Deacon index if not provided
             if (!params.hostremoval_deacon_index) {
-
-                def deacon_fasta = file(params.hostremoval_reference)
+                def deacon_fasta = file(params.hostremoval_reference, checkIfExists: true)
                 ch_deacon_fasta = channel.of(
                     tuple(
                         [ id: deacon_fasta.simpleName ],
@@ -335,58 +374,34 @@ workflow PLASMOVAR {
                     )
                 )
 
-                DEACON_INDEX (
-                    ch_deacon_fasta
-                )
-
-                ch_reads_for_hostremoval
-                    .combine(DEACON_INDEX.out.index)
-                    .map { meta, reads, _meta_index, index -> [ meta, index, reads ] }
-                    .set { ch_deacon_input }
-
+                DEACON_INDEX(ch_deacon_fasta)
                 ch_versions = ch_versions.mix(DEACON_INDEX.out.versions.first())
+                ch_deacon_index = DEACON_INDEX.out.index
 
             } else {
                 // retrieve index from input parameters
-                ch_reads_for_hostremoval
-                    .map { meta, reads -> [ meta, params.hostremoval_deacon_index ?: [] ,  reads] }
-                    .set { ch_deacon_input }
+                def deacon_index = file(params.hostremoval_deacon_index, checkIfExists: true)
+                ch_deacon_index = channel.of(
+                    tuple(
+                        [ id: deacon_index.simpleName ],
+                        file(deacon_index)
+                    )
+                )
             }
 
-            if ( params.hostremoval_deacon_diff_fasta ) {
-                def deacon_diff_fasta = file(params.hostremoval_deacon_diff_fasta)
-
-                // returns too many elements
-                // ch_deacon_diff = ch_deacon_input
-                //     .map { meta, index, reads ->
-                //         tuple(
-                //             [ id: deacon_diff_fasta.baseName ],
-                //             index,
-                //             deacon_diff_fasta
-                //         )
-                //     }
-
-                ch_deacon_index = ch_deacon_input
-                    // .map { tuple -> tuple[1] }  // Extract the index from each tuple (index is the second element)
-                    .map { _meta, index, _reads -> [index] }
-                    .unique()
-
-                ch_deacon_diff = ch_deacon_index
-                    .map { index ->
-                        tuple(
-                            [ id: "${index.simpleName}_diff_${deacon_diff_fasta.simpleName}" ],
-                            index,
-                            deacon_diff_fasta
-                        )
-                    }
-
-                DEACON_INDEX_DIFF(ch_deacon_diff)
-
-                ch_deacon_input = ch_deacon_input
-                    .combine(DEACON_INDEX_DIFF.out.index)
-                    .map { meta, _index, reads, _meta_diff, diff_index -> [ meta, diff_index, reads] }
+            if ( params.hostremoval_deacon_diff ) {
+                DEACON_INDEX_DIFF(ch_ref_fasta, ch_deacon_index)
                 ch_versions = ch_versions.mix(DEACON_INDEX_DIFF.out.versions.first())
+                ch_deacon_index = DEACON_INDEX_DIFF.out.index.map{ meta, index ->
+                    def index_id = "${meta.id}_diff_${ref_basename}"
+                    [ [ id: index_id ], index ]
+                }
             }
+
+            // Create input channel for deacon containing reads and index
+            ch_deacon_input = ch_reads_for_hostremoval
+                .combine(ch_deacon_index)
+                .map { meta, reads, _meta_index, index -> [ meta, index, reads] }
 
             // filter reads using deacon against host index
             DEACON_FILTER(ch_deacon_input)
@@ -402,45 +417,6 @@ workflow PLASMOVAR {
         // skip host removal and continue unmodified read channel for alignment
         ch_reads_for_alignment = ch_reads_for_hostremoval
     }
-
-    // Prepare reference genome and associated files
-
-    // Create channel containing the reference fasta
-    // ch_ref_fasta = channel.fromPath(params.reference_fasta)
-    //     .map { ref -> tuple([ id: ref.simpleName ], ref) }
-    //     .collect()   // or .first()
-    def ref = file(params.reference_fasta, checkIfExists: true)
-    def ref_basename = ref.simpleName
-    ch_ref_fasta = channel.value([
-        [ id: ref_basename ],
-        ref
-    ])
-
-    // Index reference fasta as .fai
-    SAMTOOLS_FAIDX(
-        ch_ref_fasta,
-        [[:], []],
-        []
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
-    ch_fai      = SAMTOOLS_FAIDX.out.fai    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai]
-
-    // Create or read bed file
-    if (params.reference_bed) {
-        bed_file = file(params.reference_bed, checkIfExists: true)
-        ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
-    } else {
-        CREATE_INTERVALS_BED(ch_fai)
-        ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
-        ch_ref_bed = CREATE_INTERVALS_BED.out.bed   // [[id:PlasmoDB-68_Pfalciparum3D7_Genome], /path/to/work/e6/dd568ffd9b39576d3677b1518aa507/PlasmoDB-68_Pfalciparum3D7_Genome.bed]
-        // TODO: prepare intervals alternative method to bin regions
-        // https://nf-co.re/modules/gatk4_preprocessintervals/
-        // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
-        // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
-        // TODO add option to supply custom bed file (e.g. ampliseq)
-    }
-
-    // TODO: sort bed file? https://bedtools.readthedocs.io/en/latest/content/tools/sort.html unix sort should be faster. Where is sorting important? Is it the order within regions or all regions as they appear in the fasta?
 
     //
     // MODULE: Run bwa index

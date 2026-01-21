@@ -8,18 +8,19 @@ process DEACON_INDEX_DIFF {
         'biocontainers/deacon:0.12.0--h4349ce8_0' }"
 
     input:
-    tuple val(meta), path(index), path(fasta)
+    tuple val(meta_fasta), path(fasta)    // fasta file to subtract from the index
+    tuple val(meta_index), path(index)
 
     output:
-    tuple val(meta), path("*.idx"), emit: index
-    path "versions.yml"           , emit: versions
+    tuple val(meta_index), path("*.idx"), emit: index
+    path "versions.yml",                  emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
     def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta_index.id}"
     """
     deacon \\
         index \\
@@ -27,7 +28,7 @@ process DEACON_INDEX_DIFF {
         --threads ${task.cpus} \\
         $args \\
         $index \\
-        $fasta > ${prefix}.idx
+        $fasta > ${prefix}.diff.idx
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
