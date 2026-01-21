@@ -593,6 +593,7 @@ workflow PLASMOVAR {
             ch_ref_fasta.map{ _meta, fasta -> [ fasta ] }.first(),
             ch_fai.map{ _meta, fai -> fai }.first()
         )
+        ch_multiqc_files = ch_multiqc_files.mix(GATK4_MARKDUPLICATES.out.metrics.collect{it[1]})
         ch_versions = ch_versions.mix(GATK4_MARKDUPLICATES.out.versions)
         ch_bam_markdup = GATK4_MARKDUPLICATES.out.bam
 
@@ -628,9 +629,14 @@ workflow PLASMOVAR {
         ch_bam_bai = ch_bam_markdup_sort.join(SAMTOOLS_INDEX.out.bai)
 
         SAMTOOLS_STATS(ch_bam_bai, ch_ref_fasta)
+        ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_STATS.out.stats.collect{it[1]})
+
         SAMTOOLS_FLAGSTAT(ch_bam_bai)
+        ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.flagstat.collect{it[1]})
         ch_versions = ch_versions.mix(SAMTOOLS_FLAGSTAT.out.versions)
+
         SAMTOOLS_IDXSTATS(ch_bam_bai)
+        ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_IDXSTATS.out.idxstats.collect{it[1]})
         ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions)
 
         //
@@ -639,6 +645,13 @@ workflow PLASMOVAR {
 
         ch_bam_bai_bed = ch_bam_bai.combine(ch_ref_bed.map { _meta, bed -> bed })
         MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta)
+        ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.per_base_bed.collect{it[1]})
+        ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.regions_bed.collect{it[1]})
+        ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.quantized_bed.collect{it[1]})
+        ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.thresholds_bed.collect{it[1]})
+        ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.global_txt.collect{it[1]})
+        ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.regions_txt.collect{it[1]})
+        ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.summary_txt.collect{it[1]})
     }
 
     if (!params.skip_variantcalling && !params.skip_alignment) {
@@ -853,6 +866,8 @@ workflow PLASMOVAR {
         SNPEFF_BUILD.out.config,
         ch_ref_fasta.map { meta, _fasta -> meta.id }
     )
+    ch_multiqc_files = ch_multiqc_files.mix(SNPEFF_ANNOTATE.out.report.collect{it[1]})
+
 
     //
     // Collate and save software versions
