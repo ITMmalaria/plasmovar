@@ -137,15 +137,30 @@ EOF
     """
 
     stub:
-    // Handle empty annotation_format in stub
-    def stub_format = annotation_format ?: 'gtf'
-    def annotation_file = (stub_format == 'gtf') ? 'genes.gtf' : 'genes.gff'
+    db_name = db_name ?: meta_ref.id
+    // extract gff/gtf format from filename if not provided
+    if (!annotation_format) {
+        def anno_name = annotation.name.toLowerCase()
+        if (anno_name.endsWith('.gtf') || anno_name.endsWith('.gtf.gz')) {
+            annotation_format = 'gtf'
+        } else if (anno_name.endsWith('.gff') || anno_name.endsWith('.gff.gz') ||
+                anno_name.endsWith('.gff3') || anno_name.endsWith('.gff3.gz')) {
+            annotation_format = 'gff'
+        } else {
+            annotation_format = 'gtf'
+        }
+    }
+    def annotation_file = (annotation_format == 'gtf') ? 'genes.gtf' : 'genes.gff'
     """
+    # Create the expected directory structure
     mkdir -p snpeff_db/data/${db_name}
+
+    # Create empty files matching the real process outputs
     touch snpeff_db/data/${db_name}/sequences.fa
     touch snpeff_db/data/${db_name}/${annotation_file}
     touch snpeff_db/data/${db_name}/cds.fa
+
+    # Create config file in correct location
     touch snpeff_db/snpEff.config
-    touch versions.yml
     """
 }
