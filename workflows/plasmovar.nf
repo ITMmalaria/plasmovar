@@ -824,7 +824,7 @@ workflow PLASMOVAR {
             fasta,
             file(params.reference_annotation, checkIfExists: true),
             params.reference_cds ? file(params.reference_cds, checkIfExists: true) : [],
-            params.reference_protein ? file(params.reference_protein) : [],
+            params.reference_protein ? file(params.reference_protein, checkIfExists: true) : [],
         )
     }
 
