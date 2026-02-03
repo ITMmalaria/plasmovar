@@ -12,27 +12,32 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+// Quality control and pre-processing
 include { FASTQC                                 } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIMMED               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_DECONTAMINATED        } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                                } from '../modules/nf-core/multiqc/main'
 include { FASTP                                  } from '../modules/nf-core/fastp/main'
+// Host read removal
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_INDEXER } from '../modules/nf-core/bbmap/bbsplit/main'
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_MAPPER  } from '../modules/nf-core/bbmap/bbsplit/main'
 include { DEACON_INDEX                           } from '../modules/nf-core/deacon/index/main'
 include { DEACON_INDEX_DIFF                      } from '../modules/local/deacon/diff/main'
 include { DEACON_FILTER                          } from '../modules/nf-core/deacon/filter/main'
-include { BWA_INDEX                              } from '../modules/nf-core/bwa/index/main'
-include { BWA_MEM                                } from '../modules/nf-core/bwa/mem/main'
+// Prepare reference genome
+include { CREATE_INTERVALS_BED                   } from '../modules/local/create_intervals_bed/main'
 include { SAMTOOLS_FAIDX                         } from '../modules/nf-core/samtools/faidx/main'
+include { BWA_INDEX                              } from '../modules/nf-core/bwa/index/main'
+// Alignment
+include { BWA_MEM                                } from '../modules/nf-core/bwa/mem/main'
 include { SAMTOOLS_INDEX                         } from '../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_SORT as SAMTOOLS_SORT_MARKDUP } from '../modules/nf-core/samtools/sort/main'
 include { SAMTOOLS_STATS                         } from '../modules/nf-core/samtools/stats/main'
 include { SAMTOOLS_FLAGSTAT                      } from '../modules/nf-core/samtools/flagstat/main'
 include { SAMTOOLS_IDXSTATS                      } from '../modules/nf-core/samtools/idxstats/main'
 include { GATK4_MARKDUPLICATES                   } from '../modules/nf-core/gatk4/markduplicates/main'
-include { CREATE_INTERVALS_BED                   } from '../modules/local/create_intervals_bed/main'
 include { MOSDEPTH                               } from '../modules/nf-core/mosdepth/main'
+// Variant calling
 include { GATK4_CREATESEQUENCEDICTIONARY         } from '../modules/nf-core/gatk4/createsequencedictionary/main'
 include { GATK4_BEDTOINTERVALLIST                } from '../modules/nf-core/gatk4/bedtointervallist/main'
 include { GATK4_INTERVALLISTTOOLS                } from '../modules/nf-core/gatk4/intervallisttools/main'
@@ -42,6 +47,7 @@ include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk
 include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk4/genotypegvcfs/main'
 include { GATK4_MERGEVCFS                        } from '../modules/nf-core/gatk4/mergevcfs/main'
 include { TABIX_TABIX                            } from '../modules/nf-core/tabix/tabix/main'
+// Variant annotation
 include { SNPEFF_BUILD                           } from '../modules/local/snpeff/build/main'
 include { SNPEFF_ANNOTATE                        } from '../modules/local/snpeff/annotate/main'
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
