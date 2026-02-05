@@ -203,7 +203,7 @@ workflow PLASMOVAR {
 
     // Add read groups to meta
     if (!params.only_build_reference) {
-        ch_samplesheet = ch_samplesheet.map { meta, fastqs -> addReadgroupToMeta(meta, fastqs) }
+        ch_fastq = ch_samplesheet.map { meta, fastqs -> addReadgroupToMeta(meta, fastqs) }
     }
 
 
@@ -252,7 +252,7 @@ workflow PLASMOVAR {
 
     if (!params.skip_qc) {
         FASTQC (
-            ch_samplesheet
+            ch_fastq
         )
         ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})  // MultiQC's fastqc module requires the zip output - https://multiqc.info/modules/fastqc/
     }
@@ -282,7 +282,7 @@ workflow PLASMOVAR {
     if (!params.skip_trimming) {
         // create expected input for fastp module using read adapter file path from input parameters
         // channel: [ val(meta), [ path(reads) ], path(adapters) ]
-        ch_samplesheet
+        ch_fastq
             .map { meta, reads -> [ meta, reads, params.fastp_adapter_fasta ?: [] ] }
             .set { ch_fastp_input }
 
@@ -292,16 +292,15 @@ workflow PLASMOVAR {
             params.fastp_save_trimmed_fail,
             params.fastp_save_merged
         )
-        ch_reads_for_hostremoval = FASTP.out.reads
+        ch_fastq_trimmed = FASTP.out.reads
         ch_versions = ch_versions.mix(FASTP.out.versions.first())
         ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
-    // TODO: re-run fastQC after fastp, or just rely on subworkflow mentioned above
-        if (!params.skip_qc) {
-            FASTQC_TRIMMED(ch_reads_for_hostremoval)
+            FASTQC_TRIMMED(ch_fastq_trimmed)
             ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED.out.zip.collect{it[1]})
         }
-    } else {
-        ch_reads_for_hostremoval = ch_samplesheet
+
+        // Rename output channel using the original generic name to pass it on to downstream processes, since this step was optional
+        ch_fastq = ch_fastq_trimmed
     }
     // TODO: use more descriptive name in else clause to avoid wrongly named channels
     // sarek uses "reads_for_nexttool"
@@ -355,13 +354,13 @@ workflow PLASMOVAR {
 
             // run bbsplit in map mode
             BBMAP_BBSPLIT_MAPPER (
-                ch_reads_for_hostremoval,
+                ch_fastq,
                 ch_bbsplit_index,
                 [],
                 [ [], [] ],
                 false
             )
-            ch_reads_for_alignment = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
+            ch_fastq_hostremoved = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
             ch_versions = ch_versions.mix(BBMAP_BBSPLIT_MAPPER.out.versions.first())
             // ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.stats.collect{it[1]})
             // TODO multiqc bbsplit not showing up due to bug https://github.com/MultiQC/MultiQC/pull/1513
@@ -405,23 +404,22 @@ workflow PLASMOVAR {
             }
 
             // Create input channel for deacon containing reads and index
-            ch_deacon_input = ch_reads_for_hostremoval
+            ch_deacon_input = ch_fastq
                 .combine(ch_deacon_index)
                 .map { meta, reads, _meta_index, index -> [ meta, index, reads] }
 
             // filter reads using deacon against host index
             DEACON_FILTER(ch_deacon_input)
-            ch_reads_for_alignment = DEACON_FILTER.out.fastq_filtered
+            ch_fastq_hostremoved = DEACON_FILTER.out.fastq_filtered
             ch_versions = ch_versions.mix(DEACON_FILTER.out.versions.first())
         }
 
         if (!params.skip_qc) {
-            FASTQC_DECONTAMINATED(ch_reads_for_alignment)
+            FASTQC_DECONTAMINATED(ch_fastq_hostremoved)
             ch_multiqc_files = ch_multiqc_files.mix(FASTQC_DECONTAMINATED.out.zip.collect{it[1]})
         }
-    } else {
-        // skip host removal and continue unmodified read channel for alignment
-        ch_reads_for_alignment = ch_reads_for_hostremoval
+        // Rename output channel using the original generic name to pass it on to downstream processes, since this step was optional
+        ch_fastq = ch_fastq_hostremoved
     }
 
     //
@@ -434,7 +432,7 @@ workflow PLASMOVAR {
     if (!params.reference_index) {
         // Construct bwa index for the reference fasta if it is not supplied by the user
         BWA_INDEX (ch_ref_fasta)
-        ch_bwa_index = BWA_INDEX.out.index.collect()    // collect() is required to create a re-usable value channel, otherwise it will only contain a single element which won't be emitted for each of the sample reads in ch_reads_for_alignment
+        ch_bwa_index = BWA_INDEX.out.index.collect()    // collect() is required to create a re-usable value channel, otherwise it will only contain a single element which won't be emitted for each of the sample reads in ch_fastq
         ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
     } else {
         // If pre-made index is provided, check if it matches the supplied reference
@@ -542,7 +540,7 @@ workflow PLASMOVAR {
     if (!params.skip_alignment) {
         sort_bam = true
         BWA_MEM (
-            ch_reads_for_alignment,
+            ch_fastq,
             ch_bwa_index,
             ch_ref_fasta,
             sort_bam        // markduplicates expects coordinate (or query) sorted input
