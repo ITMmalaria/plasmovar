@@ -68,7 +68,6 @@ include { methodsDescriptionText                 } from '../subworkflows/local/u
 // See read group info here: https://gatk.broadinstitute.org/hc/en-us/articles/360035890671-Read-groups
 // List of RG fields is defined by SAM format: https://samtools.github.io/hts-specs/SAMv1.pdf
 // Recommended usage: https://support.sentieon.com/appnotes/read_groups/
-// TODO: add unit test
 def addReadgroupToMeta(meta, files) {
     // Note: needs to be run on initial file path before processing,
     // otherwise the path in the work dir will not be found
@@ -79,7 +78,7 @@ def addReadgroupToMeta(meta, files) {
 
     // Define RG values, only adding non-empty values
     // This avoids problems with Picard and the need for the `VALIDATION_STRINGENCY LENIENT` option,
-    // since there will not be any empty fields like:
+    // since there will not be any empty fields like CN in the following example:
     // @RG	ID:106264-002-079.22NY35LT3.L007	CN:	PU:22NY35LT3.L007	SM:106264-002-079	LB:106264-002-079	PL:ILLUMINA
 
     // If we cannot read the flowcell ID from the fastq file, then we don't use it
@@ -92,19 +91,19 @@ def addReadgroupToMeta(meta, files) {
         ID: RG_ID,
         SM: meta.sample,
         LB: RG_LB,
-        PL: params.seq_platform,                            // defaults to ILLUMINA
+        PL: params.seq_platform,                            // defaults to ILLUMINA (nextflow.config)
         CN: params.seq_center?.trim() ?: null,              // most likely blank
-        PU: flowcell ? "${flowcell}.${meta.lane}" : null,   // used by BQSR if present, otherwise it defaults to using ID
+        PU: flowcell ? "${flowcell}.${meta.lane}" : null,   // used by BQSR if present, otherwise defaults to using ID
     ]
 
-    // Build RG string: filter out empty fields and format as RG string
+    // Build RG string: filter out empty fields and format as RG string `key:value`
     def RG_fields = RG_map
-            // example input: [ID: "sample1", SM: "sample1", CN: null, PU: "flowcell.L001"]
+            // example input map: [ID: "sample1", SM: "sample1", CN: null, PU: "flowcell.L001"]
         .findAll { _key, value ->
-            value != null && value != ''    // Explicit: keep only non-empty values
+            value != null && value != ''
         }   // returns map: [ID: "sample1", SM: "sample1", PU: "flowcell.L001"]
         .collect { key, value ->
-            "${key}:${value}"               // Format each entry as "KEY:VALUE"
+            "${key}:${value}"
         }   // returns list: ["ID:sample1", "SM:sample1", "PU:flowcell.L001"]
 
     def read_group = "\"@RG\\t${RG_fields.join('\\t')}\""
@@ -167,9 +166,6 @@ workflow PLASMOVAR {
     ch_versions = channel.empty()
     ch_multiqc_files = channel.empty()
 
-    // TODO: set correct skip options depending on which "*_only" options were enabled
-    // params.only_build_reference -> skip_trimming, skip_hostremoval, skip_alignment, skip_variantcalling
-
     //
     // Parse skip_* and only_* options to decide which optional steps will be run
     //
@@ -214,14 +210,14 @@ workflow PLASMOVAR {
             skip_annotation     = true
         }
     }
+    // TODO: Allow index only option to build indices for all required steps (bwa alignment, host decontamination, etc.)
+    // TODO: move reference genome + index building logic to separate subworkflows. Decide if everything should be bundled (easier for the only_index option) or included in the relevant step (e.g. build index for deacon in deacon section). Check how nf-core/rnaseq handles genome prep logic.
 
     // TODO create channel holding reference genome
     // Note: bwa_index expects meta channel, whereas bbsplit_indexer just needs a path
     // ch_reference = channel.value(file(params.reference_fasta))
     // ch_reference = channel.fromPath(params.reference_fasta).map{ref -> tuple (ref.simpleName, ref)}
     // reference = [[ id:'reference', primary:true ], file(params.reference_fasta)]
-
-
 
     // TODO: allow either a single fasta reference file to be supplied or multiple ones
     // via samplesheet column or via extra file listing species name + reference path
@@ -231,28 +227,41 @@ workflow PLASMOVAR {
 
     // TODO: integrate all modules/subworkflows into multiQC: https://nf-co.re/docs/contributing/tutorials/adding_modules_to_pipelines
 
-    // TODO: bundle fastq preprocessing steps into subworkflow
-
     // TODO: https://nf-co.re/modules/fastqscreen_fastqscreen
 
-    //
-    // MODULE: Concatenate FastQ files from same sample if required
-    //
-    // TODO: see nf-core/rnaseq and decide when/where concatenation should happen
+    // TODO: describe samplesheet columns in readme as done here https://nf-co.re/sarek/3.4.4/docs/usage/
 
-    // TODO: see description of from samplesheet input validation plugin:
-    //https://github.com/nextflow-io/nf-validation/blob/750a56d02ce902508eb7777188b034d0b8f3435c/docs/samplesheets/examples.md
-    // TODO: also check structure of meta map
-    // TODO: describe columns as done here https://nf-co.re/sarek/3.4.4/docs/usage/
+    // TODO: test data -> see separate branch
 
+    // TODO validate reference genomes + automatic download
+    // // Validate genome selection
+    // if (!params.genome) {
+    //     error "Please specify a genome with --genome. Available: ${params.genomes.keySet().join(', ')}"
+    // }
+    // if (!params.genomes.containsKey(params.genome)) {
+    //     error "Genome '${params.genome}' not found. Available: ${params.genomes.keySet().join(', ')}"
+    // }
+
+    // // Create reference channels
+    // ch_fasta = channel.value([
+    //     [id: params.genome],
+    //     file(params.fasta)
+    // ])
+
+
+    //
+    // Import input data from samplesheet
+    //
 
     // Add read groups to meta
     if (!params.only_index_reference) {
         ch_fastq = ch_samplesheet.map { meta, fastqs -> addReadgroupToMeta(meta, fastqs) }
     }
 
-
+    //
     // Prepare reference genome and associated files
+    //
+    // TODO: add to subworkflow? Add indexing for which downstream steps?
 
     // Create channel containing the reference fasta
     // ch_ref_fasta = channel.fromPath(params.reference_fasta)
@@ -260,10 +269,12 @@ workflow PLASMOVAR {
     //     .collect()   // or .first()
     def ref = file(params.reference_fasta, checkIfExists: true)
     def ref_basename = ref.simpleName
-    ch_ref_fasta = channel.value([
-        [ id: ref_basename ],
-        ref
-    ])
+    ch_ref_fasta = channel.value(
+        [
+            [id: ref_basename],
+            ref,
+        ]
+    )
 
     // Index reference fasta as .fai
     SAMTOOLS_FAIDX(
@@ -282,17 +293,17 @@ workflow PLASMOVAR {
         CREATE_INTERVALS_BED(ch_fai)
         ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
         ch_ref_bed = CREATE_INTERVALS_BED.out.bed   // [[id:PlasmoDB-68_Pfalciparum3D7_Genome], /path/to/work/e6/dd568ffd9b39576d3677b1518aa507/PlasmoDB-68_Pfalciparum3D7_Genome.bed]
+
         // TODO: prepare intervals alternative method to bin regions
         // https://nf-co.re/modules/gatk4_preprocessintervals/
         // https://gatk.broadinstitute.org/hc/en-us/articles/13832754597915-PreprocessIntervals
         // e.g.  generate consecutive bins of 1000 bases from the reference, useful for species with too many small regions in fasta
         // TODO add option to supply custom bed file (e.g. ampliseq)
+        // TODO: sort bed file? https://bedtools.readthedocs.io/en/latest/content/tools/sort.html unix sort should be faster. Where is sorting important? Is it the order within regions or all regions as they appear in the fasta?
     }
 
-    // TODO: sort bed file? https://bedtools.readthedocs.io/en/latest/content/tools/sort.html unix sort should be faster. Where is sorting important? Is it the order within regions or all regions as they appear in the fasta?
-
     //
-    // MODULE: Run FastQC
+    // Perform initial FASTQC quality control on raw reads
     //
 
     if (!skip_qc) {
@@ -303,25 +314,25 @@ workflow PLASMOVAR {
     }
 
     //
-    // MODULE: FASTP - trim reads using fastp
+    // Trim reads using fastp
     //
     // TODO: optionally switch to subworkflow:
-    // https://nf-co.re/subworkflows/fastq_trim_fastp_fastqc => could work as is
-    // https://nf-co.re/subworkflows/fastq_fastqc_umitools_fastp => convert to local subworkflow and omit redundant UMI module?
-    // allows to check for and filter out empty fastq files after trimming (or below threshold)
-    // second version also collects list of empty fastq files and number of reads for multiqc report
+        // https://nf-co.re/subworkflows/fastq_trim_fastp_fastqc => could work as is
+        // https://nf-co.re/subworkflows/fastq_fastqc_umitools_fastp => convert to local subworkflow and omit redundant UMI module?
+        // allows to check for and filter out empty fastq files after trimming (or below threshold)
+        // second version also collects list of empty fastq files and number of reads for multiqc report
 
-    // https://github.com/OpenGene/fastp?tab=readme-ov-file#adapters
-    // fastp module has --detect_adapter_for_pe option enabled, meaning it will first search for
-    // adapters through overlap analysis on a per-read basis.
-    // Auto-detection (based on first ~1M reads) is disabled by default for PE, but is re-enabled
-    // in the fastp module via --detect_adapter_for_pe (as recommended by manual:
-    //  For PE data, fastp will run a little slower if you specify the sequence adapters or enable
-    //  adapter auto-detection, but usually result in a slightly cleaner output, since the overlap
-    //  analysis may fail due to sequencing errors or adapter dimers.)
-    // Order for PE reads: 1) overlap per-read, 2) auto-detection (based on subset),
-    //                      3) --adapter_sequence_r1/2, 4) fasta file
-    // ALSO CHANGE MODULES.CONFIG e.g.             withName: '.*:FASTQ_FASTQC_UMITOOLS_FASTP:FASTP'
+        // https://github.com/OpenGene/fastp?tab=readme-ov-file#adapters
+        // fastp module has --detect_adapter_for_pe option enabled, meaning it will first search for
+        // adapters through overlap analysis on a per-read basis.
+        // Auto-detection (based on first ~1M reads) is disabled by default for PE, but is re-enabled
+        // in the fastp module via --detect_adapter_for_pe (as recommended by manual:
+        //  For PE data, fastp will run a little slower if you specify the sequence adapters or enable
+        //  adapter auto-detection, but usually result in a slightly cleaner output, since the overlap
+        //  analysis may fail due to sequencing errors or adapter dimers.)
+        // Order for PE reads: 1) overlap per-read, 2) auto-detection (based on subset),
+        //                      3) --adapter_sequence_r1/2, 4) fasta file
+        // ALSO CHANGE MODULES.CONFIG e.g.             withName: '.*:FASTQ_FASTQC_UMITOOLS_FASTP:FASTP'
     // TODO: add option for single-ended reads
     // TODO: check fastp on split fastq option: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
     if (!skip_trimming) {
@@ -350,11 +361,9 @@ workflow PLASMOVAR {
         // Rename output channel using the original generic name to pass it on to downstream processes, since this step was optional
         ch_fastq = ch_fastq_trimmed
     }
-    // TODO: use more descriptive name in else clause to avoid wrongly named channels
-    // sarek uses "reads_for_nexttool"
 
     //
-    // Host removal / depletion / read filtering / host sequence contamination removal / host decontamination
+    // Host read removal / decontamination
     //
 
     // TODO: add BWA decontamination option
@@ -368,6 +377,7 @@ workflow PLASMOVAR {
 
     if (!skip_hostremoval) {
 
+        // use bbsplit for host read removal
         if (params.hostremoval_method == "bbsplit") {
             // use provided BBSplit index if supplied or generate from scratch otherwise
             if (!params.hostremoval_bbsplit_index) {
@@ -413,8 +423,10 @@ workflow PLASMOVAR {
             // ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.stats.collect{it[1]})
             // TODO multiqc bbsplit not showing up due to bug https://github.com/MultiQC/MultiQC/pull/1513
         }
+
         // use Deacon for host read removal
         // TODO: add prebuilt pangenome index https://github.com/bede/deacon?tab=readme-ov-file#prebuilt-indexes
+        // TODO: add deacon output to multiqc?
         else if (params.hostremoval_method == "deacon") {
 
             // create Deacon index if not provided
@@ -472,8 +484,7 @@ workflow PLASMOVAR {
     }
 
     //
-    // MODULE: Run bwa index
-    // Index reference genome if index is not already provided
+    // Create bwa index for reference genome if index is not already provided
     //
 
     // TODO: move into subworkflow
@@ -565,13 +576,13 @@ workflow PLASMOVAR {
             """.stripIndent()
         }
 
-        // Create the channel with validated index directory
+        // Create the channel with validated index directory (value channel allows singleton to be reused)
         ch_bwa_index = channel.value([
             [ id: index_basename ],
             index_dir
         ])
 
-        // Alternative option using channel.of, requires collect() to create value channel
+        // Alternative option using channel.of, requires collect() to create value channel, but the type changes to a list => not preferred
         // ch_bwa_index = channel.of(
         //     tuple(
         //         [ id: file(params.reference_fasta).simpleName ],
@@ -579,12 +590,11 @@ workflow PLASMOVAR {
         //     )
         // ).collect()
         // ch_bwa_index = channel.fromPath(params.reference_fasta)
-        //     .map( { ref ->  tuple([ id: ref.simpleName ], file(params.reference_index, checkIfExists: true)) } )
+        //     .map( { ref ->  tuple([ id: ref.simpleName ], file(params.reference_index, checkIfExists: true)) } ).collect()
     }
 
     //
-    // MODULE: Run bwa mem
-    // Alignment to reference genome
+    // bwa alignment to reference genome
     //
     if (!skip_alignment) {
         sort_bam = true
@@ -604,8 +614,7 @@ workflow PLASMOVAR {
     // new sarek approach: https://github.com/nf-core/sarek/blob/20f41d1ce8b7ba296ee22adc71fe2da2ebcae93f/subworkflows/local/fastq_preprocess_gatk/main.nf#L163
 
         //
-        // MODULE: Run picard markduplicates
-        // Mark duplicates using Picard and merge reads derived from same sample using RG values
+         // Mark duplicates using Picard and merge reads derived from same sample using RG values
         //
 
         // Group multi-lane/library samples by creating tuple with sample as grouping key
@@ -626,6 +635,8 @@ workflow PLASMOVAR {
         ch_versions = ch_versions.mix(GATK4_MARKDUPLICATES.out.versions)
         ch_bam_markdup = GATK4_MARKDUPLICATES.out.bam
 
+    // TODO check sarek's method of collecting reports...or metrics? https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L447C1-L448C104
+
     // TODO: picard module could be an alternative, but it can only process 1 sample at a time
     // i.e. it does not merge samples while taking into account read groups.
     // Requires manual concatenation/combining (https://nf-co.re/modules/samtools_cat/ or
@@ -645,7 +656,7 @@ workflow PLASMOVAR {
     // both first and collect create value channels, but first is clearer and creates a one item singleton channel, whereas collect creates a list.
 
     //
-    // Module: samtools sorting, indexing and stats collection
+    // samtools sort and index bam files and collect alignment stats
     //
 
     // TODO: move into subworkflow?
@@ -681,13 +692,30 @@ workflow PLASMOVAR {
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.global_txt.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.regions_txt.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.summary_txt.collect{it[1]})
+    }
+
+    //
+    // Call variants using GATK
+    //
+
     if (!skip_variantcalling && !skip_alignment) {
 
         //
-        // Prepare intervals for scatter-gather processing in GATK
+        // Prepare intervals for scatter-gather processing
         //
 
-        // TODO add BQSR
+        // flow:
+        // BAM files (N samples × M intervals)
+        //     ↓ GATK4_HAPLOTYPECALLER [parallel: N×M]
+        // GVCF files (N samples × M intervals)
+        //     ↓ Channel grouping
+        // GVCF groups (M intervals, each with N samples)
+        //     ↓ GATK4_GENOMICSDBIMPORT [parallel: M]
+        // GenomicsDB (M databases, one per interval)
+        //     ↓ GATK4_GENOTYPEGVCFS [parallel: M]
+        // VCF files (M interval VCFs, each with all N samples)
+        //     ↓ PICARD_MERGEVCFS
+        // Final VCF (1 file with all N samples, all M intervals)
 
         // Create GATK dictionary
         GATK4_CREATESEQUENCEDICTIONARY(ch_ref_fasta)
@@ -836,7 +864,7 @@ workflow PLASMOVAR {
             }
             .groupTuple(by: 0)
             // [ meta.genome_id, [vcfs],  [tbis] ] (1 element with all interval files)
-            .map { genome_id, vcfs, tbis ->
+            .map { genome_id, vcfs, _tbis ->
                 def final_meta = [ id: genome_id ]
                 [ final_meta, vcfs ]
             }
@@ -862,11 +890,20 @@ workflow PLASMOVAR {
         // Or use bcftools? https://nf-co.re/modules/bcftools_index/
         TABIX_TABIX(ch_final_vcf)
         ch_final_vcf_tbi = TABIX_TABIX.out.index
+        // TODO not required?
     }
 
 
+    // TODO add BQSR
+
+    // TODO: add VQSR + hard filtering
+
+    // TODO: fastq-screen -> see separate branch
+
+    // TODO: filter vcf
+
     //
-    // Module: snpEff annotation
+    // snpEff annotation
     //
 
     if (!skip_annotation && !skip_variantcalling && !skip_alignment) {
@@ -896,6 +933,10 @@ workflow PLASMOVAR {
         )
         ch_multiqc_files = ch_multiqc_files.mix(SNPEFF_ANNOTATE.out.report.collect{it[1]})
     }
+
+    // TODO:     gatk VariantsToTable -V "${ann_dir}/${species}/combined.filter_added.ann.vcf" -F CHROM -F POS -F TYPE -GF GT -O "${ann_dir}/${species}/combined.filter_added.table"
+
+    // TODO: bcf normalizes
 
     //
     // Collate and save software versions
