@@ -105,41 +105,85 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Skip QC steps.",
+                    "help_text": "If enabled, all quality control steps will be skipped.",
                     "fa_icon": "fa-solid fa-forward-fast"
                 },
                 "skip_trimming": {
                     "type": "boolean",
                     "default": false,
                     "description": "Skip fastq trimming steps.",
+                    "help_text": "If enabled, read trimming step will be skipped.",
                     "fa_icon": "fa-solid fa-forward-fast"
                 },
                 "skip_hostremoval": {
                     "type": "boolean",
                     "default": false,
                     "description": "Skip removal of human reads.",
+                    "help_text": "If enabled, host reads will not be filtered out.",
                     "fa_icon": "fa-solid fa-forward-fast"
                 },
                 "skip_alignment": {
                     "type": "boolean",
                     "default": false,
                     "description": "Skip alignment steps.",
-                    "fa_icon": "fa-solid fa-forward-fast",
-                    "help_text": "Implies that variant calling will also be disabled."
+                    "help_text": "If enabled, reads will not be aligned. Implies that any further downstream steps (variant calling and annotation) will be skipped as well.",
+                    "fa_icon": "fa-solid fa-forward-fast"
                 },
                 "skip_variantcalling": {
                     "type": "boolean",
                     "default": false,
                     "description": "Skip variant calling steps.",
+                    "help_text": "If enabled, variants will not be called. Implies that any further downstream steps (annotation) will be skipped as well.",
                     "fa_icon": "fa-solid fa-forward-fast"
                 },
-                "only_build_reference": {
+                "skip_annotation": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip variant annotation steps.",
+                    "help_text": "If enabled, variants will not be annotated.",
+                    "fa_icon": "fa-solid fa-forward-fast"
+                },
+                "only_index_reference": {
                     "type": "boolean",
                     "default": false,
                     "description": "Only build reference indices and exit.",
-                    "fa_icon": "fa-solid fa-forward-fast",
-                    "hidden": true
+                    "help_text": "If enabled, all optional steps will be skipped and only indices for reference genomes will be built.",
+                    "fa_icon": "fa-solid fa-forward-fast"
+                },
+                "only_hostremoval": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Only perform host removal steps.",
+                    "help_text": "If enabled, only quality control and host decontamination will be performed (including building of reference index if required).",
+                    "fa_icon": "fa-solid fa-forward-fast"
                 }
-            }
+            },
+            "allOf": [
+                {
+                "not": {
+                    "required": [
+                    "only_index_reference",
+                    "only_hostremoval"
+                    ]
+                },
+                "errorMessage": "Cannot use --only_index_reference and --only_hostremoval together."
+                },
+                {
+                "if": {
+                    "properties": {
+                    "skip_variantcalling": { "const": true }
+                    }
+                },
+                "then": {
+                    "not": {
+                    "properties": {
+                        "skip_annotation": { "const": false }
+                    }
+                    },
+                    "errorMessage": "When --skip_variantcalling is set, --skip_annotation must also be set."
+                }
+                }
+            ]
         },
         "fastq_trimming_options": {
             "title": "Read trimming options for fastp",

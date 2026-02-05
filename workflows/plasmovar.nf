@@ -170,6 +170,51 @@ workflow PLASMOVAR {
     // TODO: set correct skip options depending on which "*_only" options were enabled
     // params.only_build_reference -> skip_trimming, skip_hostremoval, skip_alignment, skip_variantcalling
 
+    //
+    // Parse skip_* and only_* options to decide which optional steps will be run
+    //
+
+    if (params.only_index_reference && params.only_hostremoval) {
+        log.error "Cannot use --only_index_reference and --only_hostremoval together."
+        error "Stopping pipeline. Please re-try with different options."
+    } else if (params.only_index_reference) {
+        log.warn("--only_index_reference option was selected. All selected --skip_* options will be ignored and all optional steps will be skipped (qc, trimming, hostremoval, alignment, variant calling, annotation).")
+        if (params.reference_index) {
+            log.error "--only_index_reference option was selected, but a pre-built index was already supplied via --reference_index."
+            error "Stopping pipeline. Please re-try with different options."
+        }
+        skip_qc             = true
+        skip_trimming       = true
+        skip_hostremoval    = true
+        skip_alignment      = true
+        skip_variantcalling = true
+        skip_annotation     = true
+    } else if (params.only_hostremoval) {
+        log.warn("--only_hostremoval option was selected. All selected --skip_* options will be ignored and only quality control and host decontamination steps will be run (including reference indexing if required).")
+        skip_qc             = false
+        skip_trimming       = true
+        skip_hostremoval    = false
+        skip_alignment      = true
+        skip_variantcalling = true
+        skip_annotation     = true
+    } else {
+        skip_qc             = params.skip_qc
+        skip_trimming       = params.skip_trimming
+        skip_hostremoval    = params.skip_hostremoval
+        skip_alignment      = params.skip_alignment
+        skip_variantcalling = params.skip_variantcalling
+        skip_annotation     = params.skip_annotation
+        if (skip_alignment && (!skip_variantcalling || !skip_annotation)) {
+            log.warn("Since the --skip_alignment option was selected, the variant calling and annotation steps will also be skipped (even though either of --skip_variantcalling or --skip_annotation was not explicitly set).")
+            skip_variantcalling = true
+            skip_annotation     = true
+        }
+        if (skip_variantcalling && !skip_annotation) {
+            log.warn("Since the --skip_variantcalling option was selected, the annotation step will also be skipped (even though --skip_annotation was not explictly set).")
+            skip_annotation     = true
+        }
+    }
+
     // TODO create channel holding reference genome
     // Note: bwa_index expects meta channel, whereas bbsplit_indexer just needs a path
     // ch_reference = channel.value(file(params.reference_fasta))
@@ -202,7 +247,7 @@ workflow PLASMOVAR {
 
 
     // Add read groups to meta
-    if (!params.only_build_reference) {
+    if (!params.only_index_reference) {
         ch_fastq = ch_samplesheet.map { meta, fastqs -> addReadgroupToMeta(meta, fastqs) }
     }
 
@@ -250,7 +295,7 @@ workflow PLASMOVAR {
     // MODULE: Run FastQC
     //
 
-    if (!params.skip_qc) {
+    if (!skip_qc) {
         FASTQC (
             ch_fastq
         )
@@ -279,7 +324,7 @@ workflow PLASMOVAR {
     // ALSO CHANGE MODULES.CONFIG e.g.             withName: '.*:FASTQ_FASTQC_UMITOOLS_FASTP:FASTP'
     // TODO: add option for single-ended reads
     // TODO: check fastp on split fastq option: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
-    if (!params.skip_trimming) {
+    if (!skip_trimming) {
         // create expected input for fastp module using read adapter file path from input parameters
         // channel: [ val(meta), [ path(reads) ], path(adapters) ]
         ch_fastq
@@ -295,6 +340,9 @@ workflow PLASMOVAR {
         ch_fastq_trimmed = FASTP.out.reads
         ch_versions = ch_versions.mix(FASTP.out.versions.first())
         ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
+
+        // Re-run fastQC on trimmed reads
+        if (!skip_qc) {
             FASTQC_TRIMMED(ch_fastq_trimmed)
             ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED.out.zip.collect{it[1]})
         }
@@ -318,7 +366,7 @@ workflow PLASMOVAR {
     // https://github.com/nf-core/eager/blob/dev/modules/local/host_removal.nf
     // https://github.com/nf-core/taxprofiler/blob/1.1.7/subworkflows/local/shortread_hostremoval.nf
 
-    if (!params.skip_hostremoval) {
+    if (!skip_hostremoval) {
 
         if (params.hostremoval_method == "bbsplit") {
             // use provided BBSplit index if supplied or generate from scratch otherwise
@@ -414,7 +462,8 @@ workflow PLASMOVAR {
             ch_versions = ch_versions.mix(DEACON_FILTER.out.versions.first())
         }
 
-        if (!params.skip_qc) {
+        // Re-run fastQC on host-filtered reads
+        if (!skip_qc) {
             FASTQC_DECONTAMINATED(ch_fastq_hostremoved)
             ch_multiqc_files = ch_multiqc_files.mix(FASTQC_DECONTAMINATED.out.zip.collect{it[1]})
         }
@@ -537,7 +586,7 @@ workflow PLASMOVAR {
     // MODULE: Run bwa mem
     // Alignment to reference genome
     //
-    if (!params.skip_alignment) {
+    if (!skip_alignment) {
         sort_bam = true
         BWA_MEM (
             ch_fastq,
@@ -632,9 +681,7 @@ workflow PLASMOVAR {
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.global_txt.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.regions_txt.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.summary_txt.collect{it[1]})
-    }
-
-    if (!params.skip_variantcalling && !params.skip_alignment) {
+    if (!skip_variantcalling && !skip_alignment) {
 
         //
         // Prepare intervals for scatter-gather processing in GATK
@@ -822,32 +869,33 @@ workflow PLASMOVAR {
     // Module: snpEff annotation
     //
 
-    ch_snpeff_input = ch_ref_fasta.map { meta_ref, fasta ->
-        tuple(
-            meta_ref,
-            fasta,
-            file(params.reference_annotation, checkIfExists: true),
-            params.reference_cds ? file(params.reference_cds, checkIfExists: true) : [],
-            params.reference_protein ? file(params.reference_protein, checkIfExists: true) : [],
+    if (!skip_annotation && !skip_variantcalling && !skip_alignment) {
+        ch_snpeff_input = ch_ref_fasta.map { meta_ref, fasta ->
+            tuple(
+                meta_ref,
+                fasta,
+                file(params.reference_annotation, checkIfExists: true),
+                params.reference_cds ? file(params.reference_cds, checkIfExists: true) : [],
+                params.reference_protein ? file(params.reference_protein, checkIfExists: true) : [],
+            )
+        }
+
+        SNPEFF_BUILD(
+            ch_snpeff_input,
+            params.annotation_format ?: '',
+            ch_ref_bed,
+            channel.fromPath("$projectDir/assets/snpEff.config", checkIfExists: true),
+            ch_ref_fasta.map { meta, _fasta -> meta.id },
+            )
+
+        SNPEFF_ANNOTATE(
+            ch_final_vcf,
+            SNPEFF_BUILD.out.db,
+            SNPEFF_BUILD.out.config,
+            ch_ref_fasta.map { meta, _fasta -> meta.id }
         )
+        ch_multiqc_files = ch_multiqc_files.mix(SNPEFF_ANNOTATE.out.report.collect{it[1]})
     }
-
-    SNPEFF_BUILD(
-        ch_snpeff_input,
-        params.annotation_format ?: '',
-        ch_ref_bed,
-        channel.fromPath("$projectDir/assets/snpEff.config", checkIfExists: true),
-        ch_ref_fasta.map { meta, _fasta -> meta.id },
-        )
-
-    SNPEFF_ANNOTATE(
-        ch_final_vcf,
-        SNPEFF_BUILD.out.db,
-        SNPEFF_BUILD.out.config,
-        ch_ref_fasta.map { meta, _fasta -> meta.id }
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(SNPEFF_ANNOTATE.out.report.collect{it[1]})
-
 
     //
     // Collate and save software versions
