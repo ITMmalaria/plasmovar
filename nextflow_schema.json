@@ -157,33 +157,7 @@
                     "help_text": "If enabled, only quality control and host decontamination will be performed (including building of reference index if required).",
                     "fa_icon": "fa-solid fa-forward-fast"
                 }
-            },
-            "allOf": [
-                {
-                "not": {
-                    "required": [
-                    "only_index_reference",
-                    "only_hostremoval"
-                    ]
-                },
-                "errorMessage": "Cannot use --only_index_reference and --only_hostremoval together."
-                },
-                {
-                "if": {
-                    "properties": {
-                    "skip_variantcalling": { "const": true }
-                    }
-                },
-                "then": {
-                    "not": {
-                    "properties": {
-                        "skip_annotation": { "const": false }
-                    }
-                    },
-                    "errorMessage": "When --skip_variantcalling is set, --skip_annotation must also be set."
-                }
-                }
-            ]
+            }
         },
         "fastq_trimming_options": {
             "title": "Read trimming options for fastp",
