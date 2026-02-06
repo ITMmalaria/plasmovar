@@ -173,15 +173,21 @@ workflow PLASMOVAR {
     // Parse skip_* and only_* options to decide which optional steps will be run
     //
 
-    if (params.only_index_reference && params.only_hostremoval) {
-        log.error "Cannot use --only_index_reference and --only_hostremoval together."
-        error "Stopping pipeline. Please re-try with different options."
+    def only_flags = [
+        only_index_reference : params.only_index_reference,
+        only_hostremoval     : params.only_hostremoval,
+        only_fastqscreen     : params.only_fastqscreen,
+    ]
+    def enabled_only_flags = only_flags.findAll { _k, v -> v }.keySet()
+    if (enabled_only_flags.size() > 1) {
+        log.error "The following --only_* options were used together: ${enabled_only_flags.join(', ')}"
+        error "Stopping pipeline. Please select only one --only_* option."
     } else if (params.only_index_reference) {
-        log.warn("--only_index_reference option was selected. All selected --skip_* options will be ignored and all optional steps will be skipped (qc, trimming, hostremoval, alignment, variant calling, annotation).")
         if (params.reference_index) {
             log.error "--only_index_reference option was selected, but a pre-built index was already supplied via --reference_index."
             error "Stopping pipeline. Please re-try with different options."
         }
+        log.warn("--only_index_reference option was selected. All selected --skip_* options will be ignored and all optional steps will be skipped (qc, trimming, hostremoval, alignment, variant calling, annotation).")
         skip_qc             = true
         skip_trimming       = true
         skip_fastqscreen    = true
@@ -195,6 +201,15 @@ workflow PLASMOVAR {
         skip_trimming       = true
         skip_fastqscreen    = true
         skip_hostremoval    = false
+        skip_alignment      = true
+        skip_variantcalling = true
+        skip_annotation     = true
+    } else if (params.only_fastqscreen) {
+        log.warn("--only_fastqscreen option was selected. All selected --skip_* options will be ignored and only FastQ Screen step will be run (including reference indexing if required).")
+        skip_qc             = true
+        skip_trimming       = true
+        skip_fastqscreen    = false
+        skip_hostremoval    = true
         skip_alignment      = true
         skip_variantcalling = true
         skip_annotation     = true

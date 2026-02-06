@@ -163,6 +163,13 @@
                     "description": "Only perform host removal steps.",
                     "help_text": "If enabled, only quality control and host decontamination will be performed (including building of reference index if required).",
                     "fa_icon": "fa-solid fa-forward-fast"
+                },
+                "only_fastqscreen": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Only perform FastQ Screen steps.",
+                    "help_text": "If enabled, only FastQ Screen step will be performed (including building of reference indces if required).",
+                    "fa_icon": "fa-solid fa-forward-fast"
                 }
             }
         },
