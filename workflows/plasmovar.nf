@@ -491,8 +491,7 @@ workflow PLASMOVAR {
             )
             ch_fastq_hostremoved = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
             ch_versions = ch_versions.mix(BBMAP_BBSPLIT_MAPPER.out.versions.first())
-            // ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.stats.collect{it[1]})
-            // TODO multiqc bbsplit not showing up due to bug https://github.com/MultiQC/MultiQC/pull/1513
+            ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.stats.collect{it[1]})
         }
 
         // use Deacon for host read removal
