@@ -18,6 +18,8 @@ include { FASTQC as FASTQC_TRIMMED               } from '../modules/nf-core/fast
 include { FASTQC as FASTQC_DECONTAMINATED        } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                                } from '../modules/nf-core/multiqc/main'
 include { FASTP                                  } from '../modules/nf-core/fastp/main'
+include { FASTQSCREEN_BUILDFROMINDEX             } from '../modules/local/fastqscreen/buildfromindex/main'
+include { FASTQSCREEN_FASTQSCREEN                } from '../modules/local/fastqscreen/fastqscreen/main'
 // Host read removal
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_INDEXER } from '../modules/nf-core/bbmap/bbsplit/main'
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_MAPPER  } from '../modules/nf-core/bbmap/bbsplit/main'
@@ -28,6 +30,7 @@ include { DEACON_FILTER                          } from '../modules/nf-core/deac
 include { CREATE_INTERVALS_BED                   } from '../modules/local/create_intervals_bed/main'
 include { SAMTOOLS_FAIDX                         } from '../modules/nf-core/samtools/faidx/main'
 include { BWA_INDEX                              } from '../modules/nf-core/bwa/index/main'
+include { BWA_INDEX as BWA_INDEX_FASTQSCREEN     } from '../modules/nf-core/bwa/index/main'
 // Alignment
 include { BWA_MEM                                } from '../modules/nf-core/bwa/mem/main'
 include { SAMTOOLS_INDEX                         } from '../modules/nf-core/samtools/index/main'
@@ -360,6 +363,44 @@ workflow PLASMOVAR {
 
         // Rename output channel using the original generic name to pass it on to downstream processes, since this step was optional
         ch_fastq = ch_fastq_trimmed
+    }
+
+    if (!params.skip_fastqscreen) {
+        // Parse multiple reference fasta files as input for fastqscreen
+        def ref_fastas = params.fastqscreen_fastas
+            .split(',')
+            .collect {
+                file(it.trim(), checkIfExists: true)
+            }
+        ch_fastqscreen_ref_fastas = Channel.fromList(
+            ref_fastas.collect { fastqscreen_ref ->
+                [[id: fastqscreen_ref.baseName], fastqscreen_ref]
+            }
+        )
+        // !NOTE: when using file.simpleName, all file suffixes are removed. In the case of a reference like GRCh38.chr21.fa.gz, this means that meta will hold GRCh38.bed_file. When this is passed through BWA_INDEX, the indices will be prefixed with file.baseName, i.e. GRCh38.chr21.fa.{amb,ann,bwt,pac,sa}, which causes a mismatch between the two.
+
+        // Construct bwa indexes for the fastqscreen reference fastas, if they are not provided
+        BWA_INDEX_FASTQSCREEN(ch_fastqscreen_ref_fastas)
+        // TODO: add option to use existing indices. Might be easiest to supply a directory containing a .conf + index sub-dirs to ensure filepaths are set correctly? Although file path is relative to work dir, not to conf
+
+        // Collect index directories into flattened list (genome names will be extracted from index filenames)
+        ch_fastqscreen_indexes = BWA_INDEX_FASTQSCREEN.out.index.collect { _meta, index_dir -> index_dir }
+
+        // Create FastQ Screen configuration file and directory with index files
+        FASTQSCREEN_BUILDFROMINDEX(ch_fastqscreen_indexes, "bwa")
+        ch_versions = ch_versions.mix(FASTQSCREEN_BUILDFROMINDEX.out.versions.first())
+        database_ch = FASTQSCREEN_BUILDFROMINDEX.out.database
+        database_ch.view()
+
+        // Run FastQ Screen on all input reads with the same database
+        FASTQSCREEN_FASTQSCREEN(
+            ch_fastq,
+            database_ch,
+            "bwa"
+        )
+        ch_versions = ch_versions.mix(FASTQSCREEN_FASTQSCREEN.out.versions.first())
+        ch_multiqc_files = ch_multiqc_files.mix(FASTQSCREEN_FASTQSCREEN.out.txt.collect{it[1]})
+        ch_multiqc_files = ch_multiqc_files.mix(FASTQSCREEN_FASTQSCREEN.out.html.collect{it[1]})
     }
 
     //
