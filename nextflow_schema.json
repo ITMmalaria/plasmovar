@@ -115,6 +115,13 @@
                     "help_text": "If enabled, read trimming step will be skipped.",
                     "fa_icon": "fa-solid fa-forward-fast"
                 },
+                "skip_fastqscreen": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip FastQ Screen step.",
+                    "help_text": "If enabled, reads will not be screened against different reference genomes to assess the composition.",
+                    "fa_icon": "fa-solid fa-forward-fast"
+                },
                 "skip_hostremoval": {
                     "type": "boolean",
                     "default": false,

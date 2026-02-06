@@ -184,6 +184,7 @@ workflow PLASMOVAR {
         }
         skip_qc             = true
         skip_trimming       = true
+        skip_fastqscreen    = true
         skip_hostremoval    = true
         skip_alignment      = true
         skip_variantcalling = true
@@ -192,6 +193,7 @@ workflow PLASMOVAR {
         log.warn("--only_hostremoval option was selected. All selected --skip_* options will be ignored and only quality control and host decontamination steps will be run (including reference indexing if required).")
         skip_qc             = false
         skip_trimming       = true
+        skip_fastqscreen    = true
         skip_hostremoval    = false
         skip_alignment      = true
         skip_variantcalling = true
@@ -199,6 +201,7 @@ workflow PLASMOVAR {
     } else {
         skip_qc             = params.skip_qc
         skip_trimming       = params.skip_trimming
+        skip_fastqscreen    = params.skip_fastqscreen
         skip_hostremoval    = params.skip_hostremoval
         skip_alignment      = params.skip_alignment
         skip_variantcalling = params.skip_variantcalling
@@ -365,7 +368,7 @@ workflow PLASMOVAR {
         ch_fastq = ch_fastq_trimmed
     }
 
-    if (!params.skip_fastqscreen) {
+    if (!skip_fastqscreen) {
         // Create bwa indexes for each of the provided reference fastas
         if (!params.fastqscreen_index_dir) {
 
