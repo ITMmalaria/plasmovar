@@ -366,25 +366,34 @@ workflow PLASMOVAR {
     }
 
     if (!params.skip_fastqscreen) {
-        // Parse multiple reference fasta files as input for fastqscreen
-        def ref_fastas = params.fastqscreen_fastas
-            .split(',')
-            .collect {
-                file(it.trim(), checkIfExists: true)
-            }
-        ch_fastqscreen_ref_fastas = Channel.fromList(
-            ref_fastas.collect { fastqscreen_ref ->
-                [[id: fastqscreen_ref.baseName], fastqscreen_ref]
-            }
-        )
-        // !NOTE: when using file.simpleName, all file suffixes are removed. In the case of a reference like GRCh38.chr21.fa.gz, this means that meta will hold GRCh38.bed_file. When this is passed through BWA_INDEX, the indices will be prefixed with file.baseName, i.e. GRCh38.chr21.fa.{amb,ann,bwt,pac,sa}, which causes a mismatch between the two.
+        // Create bwa indexes for each of the provided reference fastas
+        if (!params.fastqscreen_index_dir) {
 
-        // Construct bwa indexes for the fastqscreen reference fastas, if they are not provided
-        BWA_INDEX_FASTQSCREEN(ch_fastqscreen_ref_fastas)
-        // TODO: add option to use existing indices. Might be easiest to supply a directory containing a .conf + index sub-dirs to ensure filepaths are set correctly? Although file path is relative to work dir, not to conf
+            // Parse comma-separated reference fasta files as input for FastQ Screen
+            def ref_fastas = params.fastqscreen_fastas
+                .split(',')
+                .collect {
+                    file(it.trim(), checkIfExists: true)
+                }
+            ch_fastqscreen_ref_fastas = Channel.fromList(
+                ref_fastas.collect { fastqscreen_ref ->
+                    [[id: fastqscreen_ref.baseName], fastqscreen_ref]
+                }
+            )
+            // !NOTE: when using file.simpleName, all file suffixes are removed. In the case of a reference like GRCh38.chr21.fa.gz, this means that meta will hold GRCh38.bed_file. When this is passed through BWA_INDEX, the indices will be prefixed with file.baseName, i.e. GRCh38.chr21.fa.{amb,ann,bwt,pac,sa}, which causes a mismatch between the two.
 
-        // Collect index directories into flattened list (genome names will be extracted from index filenames)
-        ch_fastqscreen_indexes = BWA_INDEX_FASTQSCREEN.out.index.collect { _meta, index_dir -> index_dir }
+            // Construct bwa indexes for the fastqscreen reference fastas, if they are not provided
+            BWA_INDEX_FASTQSCREEN(ch_fastqscreen_ref_fastas)
+
+            // Collect index directories into flattened list (genome names will be extracted from index filenames)
+            ch_fastqscreen_indexes = BWA_INDEX_FASTQSCREEN.out.index.collect { _meta, index_dir -> index_dir }
+        }
+        // Use pre-supplied directory of indexes otherwise
+        else {
+            log.info("Using pre-generated directory of indexes for FastQ Screen.")
+            fastqscreen_index_dir = file(params.fastqscreen_index_dir, checkIfExists: true)
+            ch_fastqscreen_indexes = channel.fromPath("$fastqscreen_index_dir/*", type: "dir").collect()
+        }
 
         // Create FastQ Screen configuration file and directory with index files
         FASTQSCREEN_BUILDFROMINDEX(ch_fastqscreen_indexes, "bwa")

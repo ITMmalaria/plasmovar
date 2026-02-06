@@ -244,6 +244,33 @@
                 }
             }
         },
+        "fastqscreen_options": {
+            "title": "FastQ Screen options",
+            "type": "object",
+            "description": "Configure options for fastq-screen.",
+            "fa_icon": "fa-solid fa-magnifying-glass",
+            "properties": {
+                "fastqscreen_fastas": {
+                    "type": "string",
+                    "description": "Comma separated list of file paths to reference genome fastas.",
+                    "fa_icon": "fas fa-dna"
+                },
+                "fastqscreen_save_index": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Save FastQ Screen bwa index files and configuration file.",
+                    "help": "Can be re-used for later pipeline runs via --fastqscreen_conf and --fastqscreen_ref_dir",
+                    "fa_icon": "fas fa-download"
+                },
+                "fastqscreen_index_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Optional path to directory with pre-generated bwa index files for FastQ Screen.",
+                    "help": "The directory should contain subdirectories for each genome to screen against. The config file will be created automatically and does not need to be supplied.",
+                    "fa_icon": "fas fa-folder"
+                }
+            }
+        },
         "host_removal_options": {
             "title": "Host read removal options",
             "type": "object",
@@ -613,6 +640,9 @@
         },
         {
             "$ref": "#/$defs/fastq_trimming_options"
+        },
+        {
+            "$ref": "#/$defs/fastqscreen_options"
         },
         {
             "$ref": "#/$defs/host_removal_options"
