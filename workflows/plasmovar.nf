@@ -368,6 +368,10 @@ workflow PLASMOVAR {
         ch_fastq = ch_fastq_trimmed
     }
 
+    //
+    // Screen reads against different references using FastQ Screen to assess composition
+    //
+
     if (!skip_fastqscreen) {
         // Create bwa indexes for each of the provided reference fastas
         if (!params.fastqscreen_index_dir) {
@@ -402,7 +406,6 @@ workflow PLASMOVAR {
         FASTQSCREEN_BUILDFROMINDEX(ch_fastqscreen_indexes, "bwa")
         ch_versions = ch_versions.mix(FASTQSCREEN_BUILDFROMINDEX.out.versions.first())
         database_ch = FASTQSCREEN_BUILDFROMINDEX.out.database
-        database_ch.view()
 
         // Run FastQ Screen on all input reads with the same database
         FASTQSCREEN_FASTQSCREEN(
