@@ -484,7 +484,7 @@
                 "save_snpeff_db": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Save intermediate VCF files during variant calling.",
+                    "description": "Save snpEff database of the reference genome.",
                     "fa_icon": "fas fa-download"
                 }
             }

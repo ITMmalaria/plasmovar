@@ -359,9 +359,8 @@ workflow PLASMOVAR {
     if (!skip_trimming) {
         // create expected input for fastp module using read adapter file path from input parameters
         // channel: [ val(meta), [ path(reads) ], path(adapters) ]
-        ch_fastq
+        ch_fastp_input = ch_fastq
             .map { meta, reads -> [ meta, reads, params.fastp_adapter_fasta ?: [] ] }
-            .set { ch_fastp_input }
 
         FASTP (
             ch_fastp_input,
@@ -388,6 +387,7 @@ workflow PLASMOVAR {
     //
 
     if (!skip_fastqscreen) {
+        // TODO: add validation that at least one of fastqscreen_index_dir or fastqscreen_fastas needs to be supplied + add precedence or make mutually exclusive.
         // Create bwa indexes for each of the provided reference fastas
         if (!params.fastqscreen_index_dir) {
 
@@ -477,7 +477,7 @@ workflow PLASMOVAR {
             } else {
                 // Index needs to be the directory `genome/index/bbsplit` which contains a ref subdir,
                 // which in turn contains an index and genome subdir.
-                System.println("Using pre-supplied reference fasta for host removal")
+                log.info("Using pre-supplied reference fasta for bbsplit host removal")
                 ch_bbsplit_index = channel.value(file(params.hostremoval_bbsplit_index, checkIfExists: true))
             }
 
@@ -560,8 +560,8 @@ workflow PLASMOVAR {
 
     // TODO: move into subworkflow
 
+    // Construct bwa index for the reference fasta if it is not supplied by the user
     if (!params.reference_index) {
-        // Construct bwa index for the reference fasta if it is not supplied by the user
         BWA_INDEX (ch_ref_fasta)
         ch_bwa_index = BWA_INDEX.out.index.collect()    // collect() is required to create a re-usable value channel, otherwise it will only contain a single element which won't be emitted for each of the sample reads in ch_fastq
         ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
