@@ -295,7 +295,7 @@
             "properties": {
                 "hostremoval_save_filtered": {
                     "type": "boolean",
-                    "default": true,
+                    "default": false,
                     "description": "Save filtered (host-removed) FastQ files.",
                     "fa_icon": "fas fa-download"
                 },
