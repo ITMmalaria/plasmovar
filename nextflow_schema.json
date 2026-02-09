@@ -358,7 +358,7 @@
             "description": "Configure options for bwa alignment of (processed) reads against reference genome.",
             "fa_icon": "fa-solid fa-align-center",
             "properties": {
-                "save_bam": {
+                "save_bam_initial": {
                     "type": "boolean",
                     "default": false,
                     "description": "Whether to save the initial BAM files.",
