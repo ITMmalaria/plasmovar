@@ -450,44 +450,55 @@ workflow PLASMOVAR {
 
         // use bbsplit for host read removal
         if (params.hostremoval_method == "bbsplit") {
-            // use provided BBSplit index if supplied or generate from scratch otherwise
+
+            // Check if required options are provided
+            if (!params.hostremoval_reference && !params.hostremoval_bbsplit_index) {
+                log.error("Neither --hostremoval_bbsplit_index nor --hostremoval_reference were provided, but host removal with bbsplit was selected.")
+                error "Stopping pipeline. Please provide missing options."
+            }
+
+            // create bbsplit index from host reference if not provided
             if (!params.hostremoval_bbsplit_index) {
                 // Prepare channel with list of reference genomes to filter reads against.
                 // Expected format for BBMAP_BBSPLIT module is:
                 //      tuple val(other_ref_names), path (other_ref_paths)
                 //      [['name'], [/path/to/fast.gz]]
-                channel.from( [
-                    [params.hostremoval_bbsplit_reference_name,
-                    params.hostremoval_reference]
-                ] )
-                    .collect{ id, fasta -> [ [id], [file(fasta, checkIfExists: true)] ] }
-                    .set { ch_bbsplit_other_refs }
+                hostremoval_reference = file(params.hostremoval_reference, checkIfExists: true)
+                ch_bbsplit_other_refs = channel
+                    .value([[params.hostremoval_bbsplit_reference_name], [hostremoval_reference]])
 
                 // create bbsplit index for filtering
                 BBMAP_BBSPLIT_INDEXER (
-                    [ [:], [] ],
-                    [],
-                    channel.value(file(params.reference_fasta, checkIfExists: true)),
+                    [ [:], [] ],    // input reads can be omitted for building a new index
+                    [],             // input index can be omitted for building a new index
+                    channel.value(file(params.reference_fasta, checkIfExists: true)),   // primary reference
                     ch_bbsplit_other_refs,
-                    true
+                    true            // only perform index building step
                 )
                 ch_bbsplit_index = BBMAP_BBSPLIT_INDEXER.out.index
                 ch_versions = ch_versions.mix(BBMAP_BBSPLIT_INDEXER.out.versions.first())
                 // bbsplit.sh -Xmx6000M ref_primary="/path/to/primary_genome.fasta"  ref_human="/path/to/contaminant_genome.fa.gz" path=bbsplit_index_output threads=4
-            } else {
-                // Index needs to be the directory `genome/index/bbsplit` which contains a ref subdir,
+            }
+            // Retrieve host index from input parameters otherwise
+            else {
+                // Check for redundant input options
+                if (params.hostremoval_reference) {
+                    log.warn("Both a prebuilt --hostremoval_bbsplit_index and a --hostremoval_reference fasta were provided; proceeding with pre-built index for bbsplit host read removal.")
+                } else {
+                    log.info("Using pre-built reference indexes for bbsplit host read removal.")
+                }
+                // Index needs to be the directory `bbsplit_index` which contains a ref subdir,
                 // which in turn contains an index and genome subdir.
-                log.info("Using pre-supplied reference fasta for bbsplit host removal")
                 ch_bbsplit_index = channel.value(file(params.hostremoval_bbsplit_index, checkIfExists: true))
             }
 
             // run bbsplit in map mode
             BBMAP_BBSPLIT_MAPPER (
-                ch_fastq,
-                ch_bbsplit_index,
-                [],
-                [ [], [] ],
-                false
+                ch_fastq,           // input reads
+                ch_bbsplit_index,   // index database
+                [],                 // primary reference can be omitted if an index is provided
+                [ [], [] ],         // other references can be omitted if an index is provided
+                false               // do not build a new index
             )
             ch_fastq_hostremoved = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
             ch_versions = ch_versions.mix(BBMAP_BBSPLIT_MAPPER.out.versions.first())
@@ -497,9 +508,16 @@ workflow PLASMOVAR {
         // use Deacon for host read removal
         // TODO: add prebuilt pangenome index https://github.com/bede/deacon?tab=readme-ov-file#prebuilt-indexes
         // TODO: add deacon output to multiqc?
+        // TODO: check if all required deacon options are provided
         else if (params.hostremoval_method == "deacon") {
 
-            // create Deacon index if not provided
+            // Check if required options are provided
+            if (!params.hostremoval_reference && !params.hostremoval_deacon_index) {
+                log.error("Neither --hostremoval_deacon_index nor --hostremoval_reference were provided, but host removal with deacon was selected.")
+                error "Stopping pipeline. Please provide missing options."
+            }
+
+            // Create deacon index from host reference if not provided
             if (!params.hostremoval_deacon_index) {
                 def deacon_fasta = file(params.hostremoval_reference, checkIfExists: true)
                 ch_deacon_fasta = channel.of(
@@ -513,18 +531,22 @@ workflow PLASMOVAR {
                 ch_versions = ch_versions.mix(DEACON_INDEX.out.versions.first())
                 ch_deacon_index = DEACON_INDEX.out.index
 
-            } else {
-                // retrieve index from input parameters
+            }
+            // Retrieve host index from input parameters otherwise
+            else {
+                // Check for redundant input options
+                if (params.hostremoval_reference) {
+                    log.warn("Both a prebuilt --hostremoval_deacon_index and a --hostremoval_reference fasta were provided; proceeding with pre-built index for deacon host read removal.")
+                } else {
+                    log.info("Using pre-built reference indexes for deacon host read removal.")
+                }
                 def deacon_index = file(params.hostremoval_deacon_index, checkIfExists: true)
-                ch_deacon_index = channel.of(
-                    tuple(
-                        [ id: deacon_index.simpleName ],
-                        file(deacon_index)
-                    )
-                )
+                ch_deacon_index = channel.of(tuple([id: deacon_index.simpleName], file(deacon_index)))
             }
 
+            // Subtract shared minimizers between parasite index and host index (see https://github.com/bede/deacon?tab=readme-ov-file#set-operations)
             if ( params.hostremoval_deacon_diff ) {
+                log.info("Mask out parasite minimizers from deacon index for host read removal.")
                 DEACON_INDEX_DIFF(ch_ref_fasta, ch_deacon_index)
                 ch_versions = ch_versions.mix(DEACON_INDEX_DIFF.out.versions.first())
                 ch_deacon_index = DEACON_INDEX_DIFF.out.index.map{ meta, index ->
@@ -538,7 +560,8 @@ workflow PLASMOVAR {
                 .combine(ch_deacon_index)
                 .map { meta, reads, _meta_index, index -> [ meta, index, reads] }
 
-            // filter reads using deacon against host index
+            // TODO check depletion vs search mode vs benchmarks and options https://github.com/bede/deacon
+            // Filter reads using deacon against host index
             DEACON_FILTER(ch_deacon_input)
             ch_fastq_hostremoved = DEACON_FILTER.out.fastq_filtered
             ch_versions = ch_versions.mix(DEACON_FILTER.out.versions.first())
