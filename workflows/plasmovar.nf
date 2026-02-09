@@ -33,7 +33,6 @@ include { BWA_INDEX                              } from '../modules/nf-core/bwa/
 include { BWA_INDEX as BWA_INDEX_FASTQSCREEN     } from '../modules/nf-core/bwa/index/main'
 // Alignment
 include { BWA_MEM                                } from '../modules/nf-core/bwa/mem/main'
-include { SAMTOOLS_INDEX                         } from '../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_SORT as SAMTOOLS_SORT_MARKDUP } from '../modules/nf-core/samtools/sort/main'
 include { SAMTOOLS_STATS                         } from '../modules/nf-core/samtools/stats/main'
 include { SAMTOOLS_FLAGSTAT                      } from '../modules/nf-core/samtools/flagstat/main'
@@ -754,12 +753,10 @@ workflow PLASMOVAR {
 
     // TODO: move into subworkflow?
 
+        // Sort and index duplicate marked bam files
         SAMTOOLS_SORT_MARKDUP(ch_bam_markdup, ch_ref_fasta, 'bai')
         ch_bam_markdup_sort = SAMTOOLS_SORT_MARKDUP.out.bam
-
-        SAMTOOLS_INDEX(ch_bam_markdup_sort)
-        ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first())
-        ch_bam_bai = ch_bam_markdup_sort.join(SAMTOOLS_INDEX.out.bai)
+        ch_bam_bai = ch_bam_markdup_sort.join(SAMTOOLS_SORT_MARKDUP.out.bai)
 
         SAMTOOLS_STATS(ch_bam_bai, ch_ref_fasta)
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_STATS.out.stats.collect{it[1]})
