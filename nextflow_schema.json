@@ -65,7 +65,7 @@
                     "mimetype": "text/plain",
                     "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
                     "description": "Path to main reference genome in FASTA format.",
-                    "help_text": "This parameter is *mandatory*. If you don't have a BWA index available, this will be generated for you automatically. Combine with `--save_reference` to save BWA index for future runs.",
+                    "help_text": "This parameter is *mandatory*. If you don't have a bwa index available for the main parasite genome, this will be generated for you automatically. Combine with `--save_index` to save bwa index for future runs.",
                     "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
                     "fa_icon": "fa-solid fa-book"
                 },
@@ -74,14 +74,14 @@
                     "format": "directory-path",
                     "exists": true,
                     "description": "Optional path to directory housing BWA index files.",
-                    "help_text": "Expected files are `*.{amb,.ann,.bwt,.pac,.sa}`. Files should have the same name as the main reference genome FASTA."
+                    "help_text": "Expected files are `*.{amb,.ann,.bwt,.pac,.sa}`. Files should have the same name as the main parasite reference genome FASTA."
                 },
-                "save_reference": {
+                "save_index": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Whether to save the generated reference index files.",
+                    "description": "Whether to save the generated bwa reference index.",
                     "fa_icon": "fas fa-download",
-                    "help_text": "Set to true to save all generated reference index files (BWA files for both main alignment and FastQScreen). These can be supplied to future runs via `--reference_index` and `TODO` to avoid unnecessary recomputation."
+                    "help_text": "Set to true to save the generated bwa index for the main parasite reference. The bwa index can be supplied to future runs via `--reference_index` to avoid unnecessary recomputation."
                 },
                 "reference_bed": {
                     "type": "string",
@@ -328,6 +328,7 @@
                     "format": "directory-path",
                     "exists": true,
                     "description": "Path to BBSplit index directory for host removal.",
+                    "help": "Should be a directory containing a subdirectory named 'ref', which in turns consists of a 'genome' and an 'index' subdirectory.",
                     "fa_icon": "fas fa-folder"
                 },
                 "hostremoval_bbsplit_reference_name": {
@@ -409,6 +410,13 @@
                     "default": 20,
                     "description": "Maximum number of files into which to scatter the intervals for parallel processing.",
                     "fa_icon": "fas fa-th"
+                },
+                "save_interval_scatter": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Save scattered interval lists for debugging purposes.",
+                    "fa_icon": "fas fa-download",
+                    "hidden": true
                 }
             }
         },
