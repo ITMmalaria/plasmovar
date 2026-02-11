@@ -9,15 +9,15 @@ process SNPEFF_BUILD {
 
     input:
     tuple val(meta_ref), path(fasta), path(annotation), path(cds), path(protein)    // cds and protein are optional
-    // TODO: use , arity: '0..*' or typed inputs? See https://github.com/nextflow-io/nextflow/issues/5111 & https://github.com/nextflow-io/nextflow/issues/1694
-    // TODO: use stageAs to change name immediately without relying on the bash script to do it
+    // TODO: optionally use , arity: '0..*' or typed inputs? See https://github.com/nextflow-io/nextflow/issues/5111 & https://github.com/nextflow-io/nextflow/issues/1694
+    // TODO: optionally use stageAs to change name immediately without relying on the bash script to do it
     val annotation_format           // 'gff', 'gtf' or empty (falls back to detection in filename)
     tuple val(meta_bed), path(bed)  // BED file for mitochondrial/apicoplast detection
-    path snpeff_config_template
+    path snpeff_config_template     // TODO: instead of requiring users to supply this file, it could also be read from the snpEff install directory
     val db_name
 
     output:
-    // tuple val(meta_ref), path("snpeff_db"), emit: db   // Alternative approach: output self-contained directory with snpEff config and database, requires the use of relative -dataDir option in snpEff annotate command
+    // TODO: `tuple val(meta_ref), path("snpeff_db"), emit: db` could serve as an alternative approach => outputs self-contained directory with snpEff config and database, but requires the use of a relative -dataDir option in the snpEff annotate command
     tuple val(meta_ref), path("snpeff_db/data"),            emit: db
     tuple val(meta_ref), path("snpeff_db/snpEff.config"),   emit: config
     tuple val("${task.process}"), val('snpeff'), eval("snpEff -version 2>&1 | cut -f 2 -d '\t'"), topic: versions, emit: versions_snpeff
@@ -74,7 +74,7 @@ process SNPEFF_BUILD {
     # Only copy CDS and proteins files if provided
     # Note: quotes around variables during file existence check are critical,
     # otherwise the tests will default to true when the variable is an empty string
-    # `if [ -f \$undeclared_var ]` = `if [ -f ]` = true
+    # e.g., `if [ -f \$undeclared_var ]` = `if [ -f ]` = true
     if [ -f "${cds}" ]; then
         if [[ "${cds}" == *.gz ]]; then
             gunzip -c ${cds} > snpeff_db/data/${db_name}/cds.fa
@@ -101,7 +101,6 @@ process SNPEFF_BUILD {
 
     # Append custom genome configuration to config
     cat >> snpeff_db/snpEff.config << EOF
-
 # ${db_name} genome configuration
 ${db_name}.genome : ${db_name}
 EOF
@@ -159,6 +158,7 @@ EOF
     touch snpeff_db/data/${db_name}/sequences.fa
     touch snpeff_db/data/${db_name}/${annotation_file}
     touch snpeff_db/data/${db_name}/cds.fa
+    touch snpeff_db/data/${db_name}/protein.fa
 
     # Create config file in correct location
     touch snpeff_db/snpEff.config

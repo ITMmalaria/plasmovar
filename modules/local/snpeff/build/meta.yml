@@ -1,0 +1,106 @@
+name: snpeff_build
+description: Build database and config file for snpEff genetic variant annotation and functional effect prediction
+keywords:
+  - annotation
+  - effect prediction
+  - snpeff
+  - variant
+  - vcf
+  - build
+tools:
+  - snpeff:
+      description: |
+        SnpEff is a variant annotation and effect prediction tool.
+        It requires a pre-built database and config file.
+      homepage: https://pcingola.github.io/SnpEff/
+      documentation: https://pcingola.github.io/SnpEff/se_introduction/
+      licence: ["MIT"]
+      identifier: biotools:snpeff
+input:
+  - - meta_ref:
+        type: map
+        description: |
+          Groovy Map containing fasta information
+          e.g. [ id:'test' ]
+    - fasta:
+        type: file
+        description: |
+          reference genome fasta file
+        ontologies: []
+    - annotation:
+        type: file
+        description: |
+          reference genome annotation file (gff(3)/gtf)
+        ontologies: []
+    - cds:
+        type: file
+        description: |
+          optional reference genome cds fasta file
+        ontologies: []
+    - protein:
+        type: file
+        description: |
+          optional reference genome protein fasta file
+        ontologies: []
+  - annotation_format:
+        type: string
+        description: |
+          optionally specify the format of the annotation file (gtf, gff or gff3)
+          will be read from the file extension if not supplied
+        ontologies: []
+  - - meta_bed:
+        type: map
+        description: |
+          Groovy Map containing bed file information
+          e.g. [ id:'test' ]
+    - bed:
+        type: file
+        description: |
+          bed file containing contig names used for detecting mitochondrial
+          and apicoplast chromosomes
+    - snpeff_config_template:
+        type: file
+        description: |
+          snpEff config file template
+        ontologies: []
+    - db_name:
+        type: string
+        description: |
+          optional name to use for the genome database directory
+        ontologies: []
+output:
+  db:
+    - - meta_ref:
+          type: map
+          description: |
+            Groovy Map containing fasta information
+            e.g. [ id:'test' ]
+      - "snpeff_db/data":
+          type: directory
+          description: |
+            directory containing snpEff databases (e.g. directory containing subdirectories for genome x and y)
+          ontologies: []
+  config:
+    - - meta_ref:
+          type: map
+          description: |
+            Groovy Map containing fasta information
+            e.g. [ id:'test' ]
+      - "snpeff_db/snpEff.config":
+          type: file
+          description: |
+            snpEff config file containing genome database options
+          ontologies: []
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The process the versions were collected from
+      - snpeff:
+          type: string
+          description: The tool name
+      - "snpEff -version 2>&1 | cut -f 2 -d '\t'":
+          type: string
+          description: The command used to generate the version of the tool
+authors:
+  - "@pmoris"

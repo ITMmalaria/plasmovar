@@ -1,0 +1,165 @@
+name: snpeff_annotate
+description: Genetic variant annotation and functional effect prediction toolbox
+keywords:
+  - annotation
+  - effect prediction
+  - snpeff
+  - variant
+  - vcf
+tools:
+  - snpeff:
+      description: |
+        SnpEff is a variant annotation and effect prediction tool.
+        It annotates and predicts the effects of genetic variants on genes and proteins (such as amino acid changes).
+      homepage: https://pcingola.github.io/SnpEff/
+      documentation: https://pcingola.github.io/SnpEff/se_introduction/
+      licence: ["MIT"]
+      identifier: biotools:snpeff
+input:
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. [ id:'test', single_end:false ]
+    - vcf:
+        type: file
+        description: |
+          vcf to annotate
+        ontologies: []
+  - - meta_db:
+        type: map
+        description: |
+          Groovy Map containing fasta information
+          e.g. [ id:'test' ]
+    - snpeff_db:
+        type: directory
+        description: |
+          directory containing snpEff databases (e.g. directory containing subdirectories for genome x and y)
+        ontologies: []
+  - - meta_config:
+        type: map
+        description: |
+          Groovy Map containing fasta information
+          e.g. [ id:'test' ]
+    - snpeff_config:
+        type: file
+        description: |
+          snpEff config file containing genome database options
+        ontologies: []
+output:
+  vcf:
+    - - meta:
+          type: map
+      - "*.ann.vcf":
+          type: file
+          description: |
+            annotated vcf
+          pattern: "*.ann.vcf"
+          ontologies: []
+  report:
+    - - meta:
+          type: map
+      - "*.csv":
+          type: file
+          description: snpEff report csv file
+          pattern: "*.csv"
+          ontologies:
+            - edam: http://edamontology.org/format_3752 # CSV
+  summary:
+    - - meta:
+          type: map
+      - "*.html":
+          type: file
+          description: snpEff summary statistics in html file
+          pattern: "*.html"
+          ontologies: []
+  genes_txt:
+    - - meta:
+          type: map
+      - "*.genes.txt":
+          type: file
+          description: txt (tab separated) file having counts of the number of variants
+            affecting each transcript and gene
+          pattern: "*.genes.txt"
+          ontologies: []
+  versions_snpeff:
+    - - ${task.process}:
+          type: string
+          description: The process the versions were collected from
+      - snpeff:
+          type: string
+          description: The tool name
+      - "snpEff -version 2>&1 | cut -f 2 -d '\t'":
+          type: string
+          description: The command used to generate the version of the tool
+topics:
+  multiqc_files:
+    - - meta:
+          type: file
+          description: |
+            annotated vcf
+          pattern: "*.ann.vcf"
+          ontologies: []
+      - ${task.process}:
+          type: string
+          description: The process
+      - snpeff:
+          type: string
+          description: The tool name
+      - "*.csv":
+          type: file
+          description: snpEff report csv file
+          pattern: "*.csv"
+          ontologies:
+            - edam: http://edamontology.org/format_3752 # CSV
+    - - meta:
+          type: file
+          description: |
+            annotated vcf
+          pattern: "*.ann.vcf"
+          ontologies: []
+      - ${task.process}:
+          type: string
+          description: The process
+      - snpeff:
+          type: string
+          description: The tool name
+      - "*.html":
+          type: file
+          description: snpEff summary statistics in html file
+          pattern: "*.html"
+          ontologies: []
+    - - meta:
+          type: file
+          description: |
+            annotated vcf
+          pattern: "*.ann.vcf"
+          ontologies: []
+      - ${task.process}:
+          type: string
+          description: The process
+      - snpeff:
+          type: string
+          description: The tool name
+      - "*.genes.txt":
+          type: file
+          description: txt (tab separated) file having counts of the number of variants
+            affecting each transcript and gene
+          pattern: "*.genes.txt"
+          ontologies: []
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The process the versions were collected from
+      - snpeff:
+          type: string
+          description: The tool name
+      - "snpEff -version 2>&1 | cut -f 2 -d '\t'":
+          type: string
+          description: The command used to generate the version of the tool
+authors:
+  - "@maxulysse"
+maintainers:
+  - "@maxulysse"
+contributors:
+  - "@pmoris"
