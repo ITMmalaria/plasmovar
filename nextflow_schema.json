@@ -193,16 +193,6 @@
                     "help_text": "See: https://github.com/OpenGene/fastp#merge-paired-end-reads",
                     "fa_icon": "fas fa-download"
                 },
-                "fastp_adapter_fasta": {
-                    "type": "string",
-                    "format": "file-path",
-                    "exists": true,
-                    "mimetype": "text/plain",
-                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
-                    "description": "Path to FASTA file containing adapter sequences for trimming.",
-                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
-                    "fa_icon": "fas fa-file"
-                },
                 "fastp_save_trimmed_fail": {
                     "type": "boolean",
                     "default": false,
@@ -210,21 +200,42 @@
                     "help_text": "See: https://github.com/OpenGene/fastp?tab=readme-ov-file#store-the-reads-that-fail-the-filters",
                     "fa_icon": "fas fa-download"
                 },
+                "fastp_adapter_fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Optional path to FASTA file containing adapter sequences for trimming.",
+                    "help_text": "fastp will automatically detect adapters if this is not supplied.",
+                    "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
+                    "fa_icon": "fas fa-file"
+                },
+                "fastp_overrepresentation": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable overrepresented sequence analysis (enabled by default)."
+                },
+                "fastp_trim_poly_g": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable polyG tail trimming.",
+                    "help_text": "Enabled by default for NextSeq/NovaSeq data. See: https://github.com/OpenGene/fastp?tab=readme-ov-file#polyg-tail-trimming",
+                    "fa_icon": "fas fa-cut"
+                },
                 "fastp_qualified_quality_phred": {
                     "type": "integer",
-                    "default": 20,
-                    "description": "The quality value that a base is qualified. Default 20 means phred quality >=Q20 is qualified.",
+                    "description": "The quality value that a base is qualified. Used in conjunction with --fastp_unqualified_percent_limit. Fastp default is 15.",
                     "fa_icon": "fas fa-chart-line"
                 },
                 "fastp_unqualified_percent_limit": {
                     "type": "integer",
-                    "default": 10,
-                    "description": "How many percents of bases are allowed to be unqualified (0~100).",
+                    "description": "How many percents of bases are allowed to be unqualified (0-100). Fastp default is 40%.",
                     "fa_icon": "fas fa-percent"
                 },
                 "fastp_length_required": {
                     "type": "integer",
-                    "description": "Minimum length requirement for reads after trimming. Reads shorter than this will be discarded.",
+                    "description": "Reads shorter than this will be discarded.",
                     "fa_icon": "fas fa-ruler"
                 },
                 "fastp_cut_front": {
@@ -244,13 +255,6 @@
                     "default": false,
                     "description": "Disable adapter trimming.",
                     "fa_icon": "fas fa-ban"
-                },
-                "fastp_trim_poly_g": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable polyG tail trimming.",
-                    "help_text": "Enabled by default for NextSeq/NovaSeq data. See: https://github.com/OpenGene/fastp?tab=readme-ov-file#polyg-tail-trimming",
-                    "fa_icon": "fas fa-cut"
                 },
                 "fastp_extra_args": {
                     "type": "string",
