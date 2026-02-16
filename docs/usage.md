@@ -14,41 +14,34 @@ You will need to create a samplesheet with information about the samples you wou
 --input '[path to samplesheet file]'
 ```
 
-### Multiple runs of the same sample
-
-The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth. The pipeline will concatenate the raw reads before performing any downstream analysis. Below is an example for the same sample sequenced across 3 lanes:
-
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L003_R1_001.fastq.gz,AEG588A1_S1_L003_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L004_R1_001.fastq.gz,AEG588A1_S1_L004_R2_001.fastq.gz
-```
-
 ### Full samplesheet
 
-The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first 3 columns to match those defined in the table below.
-
-A final samplesheet file consisting of both single- and paired-end data may look something like the one below. This is for 6 samples, where `TREATMENT_REP3` has been sequenced twice.
-
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP2,AEG588A2_S2_L002_R1_001.fastq.gz,AEG588A2_S2_L002_R2_001.fastq.gz
-CONTROL_REP3,AEG588A3_S3_L002_R1_001.fastq.gz,AEG588A3_S3_L002_R2_001.fastq.gz
-TREATMENT_REP1,AEG588A4_S4_L003_R1_001.fastq.gz,
-TREATMENT_REP2,AEG588A5_S5_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L004_R1_001.fastq.gz,
-```
+The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first 5 columns to match those defined in the table below.
 
 | Column    | Description                                                                                                                                                                            |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Spaces in sample names are automatically converted to underscores (`_`). |
+| `library` | Optional library identifier. This entry is required to distinguish between samples with the same name (and potentially lane) if multiple libraries were sequenced.                                                 |
+| `lane`    | Lane number (e.g. "L001") which must be provided if samples are split across lanes and cannot be distinguished. Lane identifier cannot contain spaces. Can be automatically extracted from filenames if detected.|
 | `fastq_1` | Full path to FastQ file for Illumina short reads 1. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
 | `fastq_2` | Full path to FastQ file for Illumina short reads 2. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
 
 An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
+
+### Multiple runs of the same sample
+
+The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth or when multiple libraries were created. The pipeline will pre-process the raw reads separately, but concatenate them downstream after alignment. The library and lane columns will be used to correctly assign [read groups fields](https://support.sentieon.com/appnotes/read_groups/) and combine reads that originate from the same biological sample. Below is an example showing a sample with a single library sequenced on a 1 lane, and another sample with two libraries sequenced across 1 and 3 lanes respectively:
+
+```csv title="samplesheet.csv"
+sample,library,lane,fastq_1,fastq_2
+sample-1,,,sample-1_L008_R1.fastq.gz,sample-1_L008_R2.fastq.gz
+sample-2,lib-1,,sample-2_lib-1_L001_R1.fastq.gz,sample-2_lib-1_L001_R2.fastq.gz
+sample-2,lib-2,L003,sample-2_L003_R1.fastq.gz,sample-2_L003_R2.fastq.gz
+sample-2,lib-2,L005,sample-2_L005_R1.fastq.gz,sample-2_L005_R2.fastq.gz
+sample-2,lib-2,L007,sample-2_L007_R1.fastq.gz,sample-2_L007_R2.fastq.gz
+```
+
+Note that library and lane info can be omitted when this is not required to distinguish between sequencing runs. Additionally, the lane info can be extracted automatically based on the fastq file names.
 
 ## Running the pipeline
 

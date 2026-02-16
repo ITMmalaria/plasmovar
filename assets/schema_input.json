@@ -23,7 +23,7 @@
             "library": {
                 "type": ["string", "integer", "null"],
                 "pattern": "^\\S+$",
-                "errorMessage": "Library identifier is required to distinguish samples with the same name (and potentially lane) if different libraries were sequenced.",
+                "errorMessage": "Library identifier is required to distinguish between samples with the same name (and potentially lane) if multiple libraries were sequenced.",
                 "meta": ["library"],
                 "default": null
             },

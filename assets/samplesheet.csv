@@ -1,3 +1,7 @@
-sample,fastq_1,fastq_2
-SAMPLE_PAIRED_END,/path/to/fastq/files/AEG588A1_S1_L002_R1_001.fastq.gz,/path/to/fastq/files/AEG588A1_S1_L002_R2_001.fastq.gz
-SAMPLE_SINGLE_END,/path/to/fastq/files/AEG588A4_S4_L003_R1_001.fastq.gz,
+sample,library,lane,fastq_1,fastq_2
+sample-1,,,/path/to/fastq/files/sample-1_L008_R1.fastq.gz,/path/to/fastq/files/sample-1_L008_R2.fastq.gz
+sample-2,lib-1,,/path/to/fastq/files/sample-2_lib-1_L001_R1.fastq.gz,/path/to/fastq/files/sample-2_lib-1_L001_R2.fastq.gz
+sample-2,lib-2,L003,/path/to/fastq/files/sample-2_L003_R1.fastq.gz,/path/to/fastq/files/sample-2_L003_R2.fastq.gz
+sample-2,lib-2,L005,/path/to/fastq/files/sample-2_L005_R1.fastq.gz,/path/to/fastq/files/sample-2_L005_R2.fastq.gz
+sample-2,lib-2,L007,/path/to/fastq/files/sample-2_L007_R1.fastq.gz,/path/to/fastq/files/sample-2_L007_R2.fastq.gz
+sample-3-single-end,,,/path/to/fastq/files/sample-3-single-end_S4_L003_R1_001.fastq.gz
