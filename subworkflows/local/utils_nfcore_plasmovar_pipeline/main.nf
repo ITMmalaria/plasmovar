@@ -92,20 +92,14 @@ workflow PIPELINE_INITIALISATION {
                     log.warn("Auto-detected lane ${detected_lane} for sample ${meta.id} with fastq file(s) ${fastq_1} ${fastq_2}")
                 }
                 else {
-                    log.warn("Could not extract lane information from FASTQ filename: ${fastq_1}. This could lead to duplicate input warnings later on.")
+                    log.warn("Could not extract lane information from FASTQ filename: ${fastq_1}. Proceeding without lane info, but this could lead to duplicate input warnings later on.")
                 }
             }
             // auto-detect flowcell if not provided - used for checking uniqueness and read group construction
             if (params.auto_detect_flowcells && !meta.flowcell && meta.id) {
                 def detected_flowcell = extractFlowcellFromFastq(fastq_1)
                 if (!detected_flowcell) {
-                    log.warn("""
-                        Could not extract flowcell ID from FASTQ file: ${fastq_1}.
-
-                        Please ensure your FASTQ files have standard Illumina headers, or provide
-                        a 'library' column in your samplesheet with unique identifiers per sequencing run.
-                    """.stripIndent())
-                    error()
+                    log.warn("Could not extract flowcell ID from FASTQ header in file: ${fastq_1}. Proceeding without flowcell info, but this could lead to duplicate input warnings later on.")
                 }
                 // check if flowcells match for paired reads
                 if (fastq_2) {
@@ -371,19 +365,8 @@ def extractFlowcellFromFastq(path) {
         fcid = fields[2]
     } else if (fields.size() == 5) {
         fcid = fields[0]
-    } else {
-        log.error("""
-            Could not parse flowcell ID from FASTQ header in ${path}.
-
-            Header: @${line}
-
-            Expected 7 fields (CASAVA 1.8+) or 5 fields (older format)
-            Got ${fields.size()} fields.
-
-            If your FASTQ uses a non-standard format, please provide the 'flowcell' field explicitly in your samplesheet.
-        """.stripIndent())
-        error("Please verify FASTQ header for the presence of a flowcell or provide a flowcell field in your samplesheet.")
     }
+    // returns null otherwise
     return fcid
 }
 
