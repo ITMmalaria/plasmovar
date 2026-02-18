@@ -8,40 +8,64 @@
 
 ## Samplesheet input
 
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown in the examples below.
+You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with a minimum of 3 columns, and a header row as shown in the examples below.
 
 ```bash
 --input '[path to samplesheet file]'
 ```
 
+### Minimal samplesheet
+
+A minimal samplesheet would contain just the `sample` and `fastq_1` columns (and `fastq_2` for paired-end sequencing data).
+
+```csv title="minimal-samplesheet.csv"
+sample,fastq_1,fastq_2
+sample-1,sample-1_R1.fastq.gz,sample-1_R2.fastq.gz
+sample-2,sample-2_R1.fastq.gz,sample-2_R2.fastq.gz
+```
+
 ### Full samplesheet
 
-The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first 5 columns to match those defined in the table below.
+The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first `sample`, `fastq_1` and `fastq_2` columns to match those defined in the table below.
 
 | Column    | Description                                                                                                                                                                            |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Spaces in sample names are automatically converted to underscores (`_`). |
-| `library` | Optional library identifier. This entry is required to distinguish between samples with the same name (and potentially lane) if multiple libraries were sequenced.                                                 |
-| `lane`    | Lane number (e.g. "L001") which must be provided if samples are split across lanes and cannot be distinguished. Lane identifier cannot contain spaces. Can be automatically extracted from filenames if detected.|
+| `library` | Optional library identifier. Required to distinguish between multiplexed libraries derived from the same sample run on the same flowcell/lane. Used during GATK read groups construction (LB, e.g. duplicate marking is only performed within libraries). |
+| `lane`    | Optional lane number (e.g. "L001"). Will be automatically extracted from the filenames when not provided. Required when samples (derived from the same library) are split across lanes (on the same flowcell) and cannot be distinguished otherwise. Used during GATK read groups construction (ID & PU). |
+| `flowcell`| Optional flowcell identifier. Will be automatically extracted from FASTQ header when not provided. Required to distinguish between runs for the same (single-library) sample on different flowcells with identical lane identifiers. Used during GATK read groups construction (ID & PU). |
 | `fastq_1` | Full path to FastQ file for Illumina short reads 1. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
 | `fastq_2` | Full path to FastQ file for Illumina short reads 2. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
+
+> [!TIP]
+> `library`, `lane` and `flowcell` are optional columns. If you need these columns for even one sample, include them in the header and leave them empty for samples that don't need them. Otherwise, the columns can be omitted entirely.
 
 An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
 
 ### Multiple runs of the same sample
 
-The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth or when multiple libraries were created. The pipeline will pre-process the raw reads separately, but concatenate them downstream after alignment. The library and lane columns will be used to correctly assign [read groups fields](https://support.sentieon.com/appnotes/read_groups/) and combine reads that originate from the same biological sample. Below is an example showing a sample with a single library sequenced on a 1 lane, and another sample with two libraries sequenced across 1 and 3 lanes respectively:
+The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth or when multiple libraries were created. The pipeline will pre-process the raw reads separately, but concatenate them downstream after alignment. The library and lane columns will be used to correctly assign [read groups fields](https://support.sentieon.com/appnotes/read_groups/) and combine reads that originate from the same biological sample. Below is an example showing:
+
+- sample-1 with a single library sequenced on a single lane
+- sample-2 with two libraries sequenced across 1 and 3 lanes respectively (note that the lane identifier could have been omitted here because they can be extracted from the FASTQ filenames).
+- sample-3 with two libraries sequenced on the same flowcell/lane
+- sample 4 with a single library sequenced across two lanes on different flowcells
 
 ```csv title="samplesheet.csv"
 sample,library,lane,fastq_1,fastq_2
 sample-1,,,sample-1_L008_R1.fastq.gz,sample-1_L008_R2.fastq.gz
-sample-2,lib-1,,sample-2_lib-1_L001_R1.fastq.gz,sample-2_lib-1_L001_R2.fastq.gz
-sample-2,lib-2,L003,sample-2_L003_R1.fastq.gz,sample-2_L003_R2.fastq.gz
-sample-2,lib-2,L005,sample-2_L005_R1.fastq.gz,sample-2_L005_R2.fastq.gz
-sample-2,lib-2,L007,sample-2_L007_R1.fastq.gz,sample-2_L007_R2.fastq.gz
+sample-2,lib-2.a,L001,sample-2_lib-1_L001_R1.fastq.gz,sample-2_lib-1_L001_R2.fastq.gz
+sample-2,lib-2.b,L001,sample-2_L001_R1.fastq.gz,sample-2_L001_R2.fastq.gz
+sample-2,lib-2.b,L003,sample-2_L003_R1.fastq.gz,sample-2_L003_R2.fastq.gz
+sample-2,lib-2.b,L007,sample-2_L007_R1.fastq.gz,sample-2_L007_R2.fastq.gz
+sample-3,lib-3.a,L001,sample-3_LIB-3.a_L001_R1.fastq.gz,sample-3_LIB-3.a_L001_R2.fastq.gz
+sample-3,lib-3.b,L001,sample-3_LIB-3.b_L001_R1.fastq.gz,sample-3_LIB-3.b_L001_R2.fastq.gz
+sample-4,,,sample-4_232WTNLT4_L001_R1.fastq.gz,sample-4_232WTNLT4_L001_R2.fastq.gz
+sample-4,,,sample-4_232KF7LT4_L001_R1.fastq.gz,sample-4_232KF7LT4_L001_R2.fastq.gz
 ```
 
-Note that library and lane info can be omitted when this is not required to distinguish between sequencing runs. Additionally, the lane info can be extracted automatically based on the fastq file names.
+> [!NOTE]
+> `library`, `lane` and `flowcell` info can be omitted when not required to distinguish between sequencing runs. Additionally, lane and flowcell info can be extracted automatically based on the FASTQ file names.
 
 ## Running the pipeline
 

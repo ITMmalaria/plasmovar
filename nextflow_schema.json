@@ -47,8 +47,12 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Whether to (attempt to) automatically extract the lane ID from from the input fastq filenames when this info is missing from the samplesheet. Searches for file patterns such as `_L001_`, `_L1_`, `.L01`, `_lane1_` or `_lane-01_`."
+                },
+                "auto_detect_flowcells": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to (attempt to) automatically extract flowcell IDs from from the input fastq files when this info is missing from the samplesheet."
                 }
-
             }
         },
         "reference_genome_options": {

@@ -10,20 +10,27 @@
             "sample": {
                 "type": "string",
                 "pattern": "^\\S+$",
-                "errorMessage": "Sample name must be provided and cannot contain spaces (multiple samples can share the same name if they can be distinguished by lane or library)",
+                "errorMessage": "Sample name must be provided and cannot contain spaces (multiple samples can share the same name if they can be distinguished by lane or library).",
                 "meta": ["id"]
             },
             "lane": {
                 "type": ["string", "integer", "null"],
-                "pattern": "^L?\\d{1,3}$",
-                "errorMessage": "Lane number must be provided if samples are split across lanes and cannot be distinguished. Lane identifier cannot contain spaces",
+                "pattern": "^[Ll]?\\d{1,3}$",
+                "errorMessage": "Lane identifier must be provided if samples are split across lanes (on the same flowcell) and cannot be distinguished otherwise. Lane identifier cannot contain spaces. Expected formats: L001, L1, l001, l1, 001 or 1. Will be automatically extracted from the filenames when not provided. Used during read group construction.",
                 "meta": ["lane"],
+                "default": null
+            },
+            "flowcell": {
+                "type": ["string", "integer", "null"],
+                "pattern": "^\\S+$",
+                "errorMessage": "Flowcell identifier must be provided when multiple runs for the same sample and library share the same lane identifier. Will be extracted from the FASTQ headers by automatically when not provided. Used during read group construction.",
+                "meta": ["flowcell"],
                 "default": null
             },
             "library": {
                 "type": ["string", "integer", "null"],
                 "pattern": "^\\S+$",
-                "errorMessage": "Library identifier is required to distinguish between samples with the same name (and potentially lane) if multiple libraries were sequenced.",
+                "errorMessage": "Library identifier is required when multiple libraries from the same sample are multiplexed and sequenced on the same lane/flowcell. Used during read group construction.",
                 "meta": ["library"],
                 "default": null
             },
@@ -32,14 +39,14 @@
                 "format": "file-path",
                 "exists": true,
                 "pattern": "^([\\S\\s]*\\/)?[^\\s\\/]+\\.f(ast)?q\\.gz$",
-                "errorMessage": "FastQ file for reads 1 must be provided, cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'"
+                "errorMessage": "FastQ file for reads 1 must be provided, cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'."
             },
             "fastq_2": {
                 "type": "string",
                 "format": "file-path",
                 "exists": true,
                 "pattern": "^([\\S\\s]*\\/)?[^\\s\\/]+\\.f(ast)?q\\.gz$",
-                "errorMessage": "FastQ file for reads 2 cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'",
+                "errorMessage": "FastQ file for reads 2 cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'.",
                 "default": null
             }
         },

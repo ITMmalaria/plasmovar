@@ -84,12 +84,59 @@ workflow PIPELINE_INITIALISATION {
         // [[sample:sample_1, lane:1], /path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]
         // extract sample id (can be shared by multiple fastq (pairs)), so we can group by it
         .map { meta, fastq_1, fastq_2 ->
-            // auto-detect lane if not provided
+            // auto-detect lane if not provided - used for checking uniqueness and read group construction
             if (params.auto_detect_lanes && !meta.lane && meta.id) {
                 def detected_lane = extractLaneFromFilename(fastq_1.toString())
                 if (detected_lane) {
                     meta = meta + [lane: detected_lane]
                     log.warn("Auto-detected lane ${detected_lane} for sample ${meta.id} with fastq file(s) ${fastq_1} ${fastq_2}")
+                }
+                else {
+                    log.warn("Could not extract lane information from FASTQ filename: ${fastq_1}. This could lead to duplicate input warnings later on.")
+                }
+            }
+            // auto-detect flowcell if not provided - used for checking uniqueness and read group construction
+            if (params.auto_detect_flowcells && !meta.flowcell && meta.id) {
+                def detected_flowcell = extractFlowcellFromFastq(fastq_1)
+                if (!detected_flowcell) {
+                    log.warn("""
+                        Could not extract flowcell ID from FASTQ file: ${fastq_1}.
+
+                        Please ensure your FASTQ files have standard Illumina headers, or provide
+                        a 'library' column in your samplesheet with unique identifiers per sequencing run.
+                    """.stripIndent())
+                    error()
+                }
+                // check if flowcells match for paired reads
+                if (fastq_2) {
+                    def detected_flowcell_r2 = extractFlowcellFromFastq(fastq_2)
+                    if (detected_flowcell != detected_flowcell_r2) {
+                        log.error("""
+                            Flowcell ID mismatch for paired reads of sample '${meta.id}'
+
+                            Paired-end reads must originate from the same sequencing run.
+
+                            Read 1: ${fastq_1}
+                            Flowcell: ${detected_flowcell}
+
+                            Read 2: ${fastq_2}
+                            Flowcell: ${detected_flowcell_r2}
+                            """.stripIndent())
+                        error("Please check your samplesheet for mismatched FASTQ file pairs.")
+                    }
+                meta = meta + [flowcell: detected_flowcell]
+                }
+            }
+            // If flowcell is manually provided, validate it matches FASTQ headers (optional strict mode)
+            else if (params.auto_detect_flowcells && meta.flowcell) {
+                def detected_flowcell = extractFlowcellFromFastq(fastq_1)
+                if (detected_flowcell && meta.flowcell != detected_flowcell) {
+                    log.warn("""
+                        Manually provided flowcell '${meta.flowcell}' does not match
+                        flowcell '${detected_flowcell}' extracted from FASTQ header in '${fastq_1}'.
+
+                        Using manually provided value from samplesheet: '${meta.flowcell}'.
+                    """.stripIndent())
                 }
             }
             // handle single and paired-end fastq files
@@ -101,10 +148,10 @@ workflow PIPELINE_INITIALISATION {
             // TODO compare with nf-core template approach, which uses fewer nested lists + flatten.
         }
         .tap{ ch_samples } // save sample-wise channel for later re-use
-        // [sample_1, [[id:sample_1, lane:1, library: null, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
+        // [sample_1, [[id:sample_1, lane:1, library:null, flowcell:232KF7LT4, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
         // group by sample id
         .groupTuple()
-        // [sample_1, [[[id:sample_1, lane:1, library:null, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]], [[id:sample_1, lane:2, library:null, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]]
+        // [sample_1, [[[id:sample_1, lane:1, library:null, flowcell:232KF7LT4, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]], [[id:sample_1, lane:2, library:null, flowcell:232WTNLT4, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]]
         .map { validateInputSamplesheet(it) }
         // calculate number of fastq (pairs) per sample
         .map { sample, ch_items ->
@@ -112,30 +159,33 @@ workflow PIPELINE_INITIALISATION {
             def num_entries = ch_items.size()
             def has_multiple_lanes = metas.collect { it.lane }.findAll { it != null }.unique().size() > 1
             def has_multiple_libraries = metas.collect { it.library }.findAll { it != null }.unique().size() > 1
-            return [ sample, num_entries, has_multiple_lanes, has_multiple_libraries ]
+            def has_multiple_flowcells = metas.collect { it.flowcell }.findAll { it != null }.unique().size() > 1
+            return [ sample, num_entries, has_multiple_lanes, has_multiple_libraries, has_multiple_flowcells ]
         }
-        // [sample_1, 2, true, false]
+        // [sample_1, 2, true, false, true]
         .combine(ch_samples, by: 0)
-        // [sample_1, 2, true, false, [[id:sample_1, lane:1, library:null, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
-        // [sample_1, 2, true, false, [[id:sample_1, lane:2, library:null, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]
-        .map { _sample, num_entries, multi_lane, multi_lib, ch_item ->
+        // [sample_1, 2, true, false, true, [[id:sample_1, lane:1, library:null, flowcell:232KF7LT4, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
+        // [sample_1, 2, true, false, true, [[id:sample_1, lane:2, library:null, flowcell:232WTNLT4, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]
+        .map { _sample, num_entries, multi_lane, multi_lib, multi_fc, ch_item ->
             def ( meta, fastqs ) = ch_item
 
-            // build unique identifier based on sample name, library and lane
+            // build unique identifier based on sample name, library, lane and flowcell
             def id_elements = [meta.sample]
             if (meta.library) id_elements.add("LIB_${meta.library}")
             if (meta.lane) id_elements.add("LANE_${meta.lane}")
+            if (meta.flowcell) id_elements.add("FC_${meta.flowcell}")
 
             meta = meta + [
                 id: id_elements.join('-'),
                 num_entries: num_entries.toInteger(),
                 multiple_lanes: multi_lane,
-                multiple_libraries: multi_lib
+                multiple_libraries: multi_lib,
+                multiple_flowcells: multi_fc
             ]
 
             return [ meta, fastqs ]
         }
-        // [[id:sample_1-LANE_1, lane:1, library:null, single_end:false, sample:sample_1, num_entries:2, multiple_lanes:true, multiple_libraries:false], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]
+        // [[id:sample_1-LANE_1-FC_232KF7LT4, lane:1, library:null, flowcell:232KF7LT4, single_end:false, sample:sample_1, num_entries:2, multiple_lanes:true, multiple_libraries:false], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]
         .set { ch_samplesheet }
 
         // TODO: check new nfcore/tools method:
@@ -226,7 +276,7 @@ workflow PIPELINE_COMPLETION {
 //
 def validateInputSamplesheet(input) {
     // Extract meta arrays - expected format:
-    // [sample_1, [[[id:sample_1, lane:1, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]], [[id:sample_1, lane:2, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]]
+    // [sample_1, [[[id:sample_1, lane:1, library:null, flowcell:232KF7LT4, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]], [[id:sample_1, lane:2, library:null, flowcell:232WTNLT4, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]]
     def (sample, items) = input
     def metas = items.collect { it[0] }
 
@@ -235,34 +285,27 @@ def validateInputSamplesheet(input) {
         // Check that multiple runs of the same sample are of the same datatype i.e. single-end / paired-end
         def endedness_ok = metas.collect{ meta -> meta.single_end }.unique().size == 1
         if (!endedness_ok) {
-            error("Please check input samplesheet -> Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
+            log.error("Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
+            error("Please check your samplesheet for consistent single/paired-end entries per sample.")
         }
 
-        def has_lane_info = metas.every { it.lane != null }
-        def has_library_info = metas.every { it.library != null }
-
-        // Check if samples have distinguishing info
-        if (!has_lane_info && !has_library_info) {
-            error """
-                Sample '${sample}' has multiple entries but no lane or library information.
-                Please provide either 'lane' or 'library' columns in your samplesheet to distinguish between files.
-            """.stripIndent()
-        }
-
-        // Check if lane+library combinations are unique
-        def identifiers = metas.collect { "${it.lane ?: 'NA'}_${it.library ?: 'NA'}" }
+        // Check fi samples can be distinguished based on lane/flowcell/library information
+        def identifiers = metas.collect { "${it.flowcell ?: 'NA'}_${it.lane ?: 'NA'}_${it.library ?: 'NA'}" }
         if (identifiers.size() != identifiers.unique().size()) {
-            error """
-                Sample '${sample}' has duplicate lane/library combinations.
-                Each sample must have a unique combination of lane and library identifiers.
-            """.stripIndent()
+            log.error("""
+                Sample '${sample}' has duplicate flowcell/lane/library combinations.
+                Each sample must have a unique combination of flowcell, lane and library identifiers.
+                Flowcell IDs were automatically extracted from FASTQ headers.
+            """.stripIndent())
+            error("Please check samplesheet for duplicate entries.")
         }
 
-        // TODO: Can optionally be replaced by adding the following to schema_input.json:
+        // Could in theory be replaced by adding the following to schema_input.json:
         // "uniqueEntries": ["sample", "lane", "library"]
         // Should be placed just after the items declaration (i.e. level 0).
         // However, error message will be less detailed.
         // Also needs verification whether shared null/[] entries would trigger an error or not.
+        // This also won't take into account flowcell IDs.
 
         // TODO: write unit tests for these checks
     }
@@ -288,7 +331,60 @@ def extractLaneFromFilename(filename) {
         }
         return null // return nothing if no pattern is found
     }
+}
 
+// Parse first line of a FASTQ file, return the flowcell ID
+// Adapted from nf-core/sarek https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L953
+// Was originally done at run-time to construct read groups, but was moved
+// to input validation for improved uniqueness validation.
+// Now it is possible to use identical sample names and lanes for runs on different flowcells
+def extractFlowcellFromFastq(path) {
+    // expected format:
+    // xx:yy:FLOWCELLID:LANE:... (seven fields)
+    // or
+    // FLOWCELLID:LANE:xx:... (five fields)
+    def line
+    try {
+        path.withInputStream {
+            InputStream gzipStream = new java.util.zip.GZIPInputStream(it)
+            Reader decoder = new InputStreamReader(gzipStream, 'ASCII')
+            BufferedReader buffered = new BufferedReader(decoder)
+            line = buffered.readLine()
+        }
+    } catch (Exception e) {
+        log.error("Could not extract flowcell ID from ${path}: ${e.message}")
+        error("Please verify the file is a valid gzipped FASTQ.")
+
+    }
+
+    if (!line || !line.startsWith('@')) {
+        log.error("ERROR: Invalid FASTQ header in ${path}: ${line}")
+        error(" Please verify this is a valid FASTQ file.")
+    }
+
+    line = line.substring(1)
+    def fields = line.split(':')
+    String fcid = null
+
+    if (fields.size() >= 7) {
+        // CASAVA 1.8+ format
+        fcid = fields[2]
+    } else if (fields.size() == 5) {
+        fcid = fields[0]
+    } else {
+        log.error("""
+            Could not parse flowcell ID from FASTQ header in ${path}.
+
+            Header: @${line}
+
+            Expected 7 fields (CASAVA 1.8+) or 5 fields (older format)
+            Got ${fields.size()} fields.
+
+            If your FASTQ uses a non-standard format, please provide the 'flowcell' field explicitly in your samplesheet.
+        """.stripIndent())
+        error("Please verify FASTQ header for the presence of a flowcell or provide a flowcell field in your samplesheet.")
+    }
+    return fcid
 }
 
 //
