@@ -347,11 +347,16 @@ workflow PLASMOVAR {
     }
 
     //
-    // Screen reads against different references using FastQ Screen to assess composition
+    // Screen reads against different references using FastQ Screen to assess read composition
     //
 
     if (!skip_fastqscreen) {
-        // TODO: add validation that at least one of fastqscreen_index_dir or fastqscreen_fastas needs to be supplied + add precedence or make mutually exclusive.
+        // Check if required options are provided
+        if (!params.fastqscreen_index_dir && !params.fastqscreen_fastas) {
+            log.error("Neither --fastqscreen_index_dir nor --fastqscreen_fastas were provided, but FastQ Screen step was selected.")
+            error "Stopping pipeline. Please provide missing options."
+        }
+
         // Create bwa indexes for each of the provided reference fastas
         if (!params.fastqscreen_index_dir) {
 
@@ -376,7 +381,13 @@ workflow PLASMOVAR {
         }
         // Use pre-supplied directory of indexes otherwise
         else {
-            log.info("Using pre-generated directory of indexes for FastQ Screen.")
+            // Check for redundant input options
+            if (params.fastqscreen_fastas) {
+                log.warn("Both a prebuilt --fastqscreen_index_dir and a list of --fastqscreen_fastas fastas were provided; proceeding with pre-built index for FastQ Screen.")
+            } else {
+                log.info("Using pre-generated directory of indexes for FastQ Screen.")
+            }
+
             fastqscreen_index_dir = file(params.fastqscreen_index_dir, checkIfExists: true)
             ch_fastqscreen_indexes = channel.fromPath("$fastqscreen_index_dir/*", type: "dir").collect()
         }
