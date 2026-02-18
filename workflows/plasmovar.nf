@@ -973,6 +973,12 @@ workflow PLASMOVAR {
     //
 
     if (!skip_annotation && !skip_variantcalling && !skip_alignment) {
+        // Validate required input options
+        if (!params.reference_annotation) {
+            log.error("No reference annotation file was provided, but snpEff option was selected.")
+            error "Stopping pipeline. Please provide missing options."
+        }
+
         ch_snpeff_input = ch_ref_fasta.map { meta_ref, fasta ->
             tuple(
                 meta_ref,
