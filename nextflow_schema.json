@@ -461,6 +461,14 @@
             "description": "Configure variant filtering tools.",
             "fa_icon": "fas fa-filter",
             "properties": {
+                "vcf_filter_mode": {
+                    "type": "string",
+                    "default": "hard",
+                    "description": "VCF filtering mode.",
+                    "enum": ["hard", "vqsr", "VQSR"],
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Can be set to either `hard` or `vqsr`."
+                }
             }
         },
         "annotation": {

@@ -48,6 +48,7 @@ include { GATK4_HAPLOTYPECALLER                  } from '../modules/nf-core/gatk
 include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk4/genomicsdbimport/main'
 include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk4/genotypegvcfs/main'
 include { GATK4_MERGEVCFS                        } from '../modules/nf-core/gatk4/mergevcfs/main'
+include { VARIANT_FILTERING_HARD                 } from '../subworkflows/local/variant_filtering_hard/main.nf'
 include { TABIX_TABIX                            } from '../modules/nf-core/tabix/tabix/main'
 // Variant annotation
 include { SNPEFF_BUILD                           } from '../modules/local/snpeff/build/main'
@@ -779,6 +780,8 @@ workflow PLASMOVAR {
         //     ↓ GATK4_GENOMICSDBIMPORT [parallel: M]
         // GenomicsDB (M databases, one per interval)
         //     ↓ GATK4_GENOTYPEGVCFS [parallel: M]
+        // Variant filtering (M interval VCFs, each with all N samples)
+        //     ↓ VARIANT_FILTERING subworkflow [parallel: M]
         // VCF files (M interval VCFs, each with all N samples)
         //     ↓ PICARD_MERGEVCFS
         // Final VCF (1 file with all N samples, all M intervals)
@@ -919,18 +922,33 @@ workflow PLASMOVAR {
         ch_vcf_by_interval = GATK4_GENOTYPEGVCFS.out.vcf  // [[meta], vcf.gz]
         ch_vcf_tbi_by_interval = GATK4_GENOTYPEGVCFS.out.tbi
 
+        //
+        // Subworkflow: VARIANT_FILTERING (intervals)
+        //
+
+        if (params.vcf_filter_mode == 'hard') {
+            VARIANT_FILTERING_HARD(
+                ch_vcf_by_interval.join(ch_vcf_tbi_by_interval),
+                ch_ref_fasta,
+                ch_fai,
+                ch_ref_dict,
+                // ch_gzi,
+            )
+
+            ch_vcf_filter_added = VARIANT_FILTERING_HARD.out.vcf_filter_added
+
+        } else if (params.vcf_filter_mode == 'vqsr' || params.vcf_filter_mode == 'VQSR') {
+        }
         // Prepare for VCF merging: collect all interval VCFs
         // Group by genome_id to merge all intervals for that genome
-        ch_vcfs_to_merge = ch_vcf_by_interval
+        ch_vcfs_to_merge = ch_vcf_filter_added
             // [ meta, vcf ]    (1 per interval)
-            .join(ch_vcf_tbi_by_interval, by: 0)
-            // [ meta, vcf, tbi ]    (1 per interval)
-            .map { meta, vcf, tbi ->
-                [ meta.genome_id, vcf, tbi ]
+            .map { meta, vcf ->
+                [ meta.genome_id, vcf ]
             }
             .groupTuple(by: 0)
-            // [ meta.genome_id, [vcfs],  [tbis] ] (1 element with all interval files)
-            .map { genome_id, vcfs, _tbis ->
+            // [ meta.genome_id, [vcfs] ] (1 element with all interval files)
+            .map { genome_id, vcfs ->
                 def final_meta = [ id: genome_id ]
                 [ final_meta, vcfs ]
             }
