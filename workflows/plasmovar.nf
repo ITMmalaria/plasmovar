@@ -809,6 +809,8 @@ workflow PLASMOVAR {
             .combine(ch_intervals)
             .map { bam_meta, bam, bai, interval_genome_meta, interval ->
                 def combined_meta = bam_meta + [
+                    // add unique id per sample/interval combination
+                    id: "${bam_meta.id}_${interval.simpleName}",
                     genome_id: interval_genome_meta.id,
                     interval_name: interval.simpleName
                 ]
