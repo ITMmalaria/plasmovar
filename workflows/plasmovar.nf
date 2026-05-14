@@ -269,14 +269,14 @@ workflow PLASMOVAR {
         []
     )
     ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
-    ch_fai      = SAMTOOLS_FAIDX.out.fai    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai]
+    ch_ref_fai      = SAMTOOLS_FAIDX.out.fai    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai]
 
     // Create or read bed file
     if (params.reference_bed) {
         bed_file = file(params.reference_bed, checkIfExists: true)
         ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
     } else {
-        CREATE_INTERVALS_BED(ch_fai)
+        CREATE_INTERVALS_BED(ch_ref_fai)
         ch_versions = ch_versions.mix(CREATE_INTERVALS_BED.out.versions)
         ch_ref_bed = CREATE_INTERVALS_BED.out.bed   // [[id:PlasmoDB-68_Pfalciparum3D7_Genome], /path/to/work/e6/dd568ffd9b39576d3677b1518aa507/PlasmoDB-68_Pfalciparum3D7_Genome.bed]
 
@@ -698,7 +698,7 @@ workflow PLASMOVAR {
         GATK4_MARKDUPLICATES(
             ch_bam_grouped,
             ch_ref_fasta.map{ _meta, fasta -> [ fasta ] }.first(),
-            ch_fai.map{ _meta, fai -> fai }.first()
+            ch_ref_fai.map{ _meta, fai -> fai }.first()
         )
         ch_multiqc_files = ch_multiqc_files.mix(GATK4_MARKDUPLICATES.out.metrics.collect{it[1]})
         ch_versions = ch_versions.mix(GATK4_MARKDUPLICATES.out.versions)
@@ -717,7 +717,7 @@ workflow PLASMOVAR {
     // PICARD_MARKDUPLICATES(
     //     ch_bam,
     //     ch_ref_fasta,
-    //     ch_fai
+    //     ch_ref_fai
     // )
 
     // TODO     SAMTOOLS_FAIDX.out.fai.map{ _meta, fai -> fai }.first() vs .collect()
@@ -837,7 +837,7 @@ workflow PLASMOVAR {
             ch_bam_bai_intervals.map{ combined_meta, bam, bai, interval ->
                 [ combined_meta, bam, bai, interval, [] ] },
             ch_ref_fasta,
-            ch_fai,
+            ch_ref_fai,
             ch_ref_dict,
             [[:], []],  // dbsnp (optional)
             [[:], []]   // dbsnp_tbi (optional)
@@ -913,7 +913,7 @@ workflow PLASMOVAR {
         GATK4_GENOTYPEGVCFS(
             ch_genotype_input,
             ch_ref_fasta,
-            ch_fai,
+            ch_ref_fai,
             ch_ref_dict,
             [[:], []],  // dbsnp (optional)
             [[:], []]   // dbsnp_tbi (optional)
@@ -930,7 +930,7 @@ workflow PLASMOVAR {
             VARIANT_FILTERING_HARD(
                 ch_vcf_by_interval.join(ch_vcf_tbi_by_interval),
                 ch_ref_fasta,
-                ch_fai,
+                ch_ref_fai,
                 ch_ref_dict,
                 // ch_gzi,
             )

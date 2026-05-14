@@ -19,7 +19,7 @@ workflow VARIANT_FILTERING_HARD {
     take:
     ch_vcf_by_interval  // [[meta], vcf.gz, vcf.gz.tbi] - 1 per interval
     ch_ref_fasta        // [[meta], fasta]
-    ch_fai              // [[meta], fasta.fai]
+    ch_ref_fai          // [[meta], fasta.fai]
     ch_ref_dict         // [[meta], dict]
 
     main:
@@ -36,7 +36,7 @@ workflow VARIANT_FILTERING_HARD {
     FILTER_SNP(
         SELECT_SNP.out.vcf.join(SELECT_SNP.out.tbi),
         ch_ref_fasta,
-        ch_fai,
+        ch_ref_fai,
         ch_ref_dict,
         [[:], []],  // gzi index is only needed if fasta input is in bgzip format
         // ch_gzi,
@@ -44,7 +44,7 @@ workflow VARIANT_FILTERING_HARD {
     FILTER_INDEL(
         SELECT_INDEL.out.vcf.join(SELECT_INDEL.out.tbi),
         ch_ref_fasta,
-        ch_fai,
+        ch_ref_fai,
         ch_ref_dict,
         [[:], []],  // ch_gzi,
     )
