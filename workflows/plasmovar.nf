@@ -44,6 +44,7 @@ include { GATK4_CREATESEQUENCEDICTIONARY         } from '../modules/nf-core/gatk
 include { GATK4_BEDTOINTERVALLIST                } from '../modules/nf-core/gatk4/bedtointervallist/main'
 include { GATK4_INTERVALLISTTOOLS                } from '../modules/nf-core/gatk4/intervallisttools/main'
 include { BIN_INTERVALS                          } from '../modules/local/bin_intervals/main'
+include { BQSR                                   } from '../subworkflows/local/bqsr/main.nf'
 include { GATK4_HAPLOTYPECALLER                  } from '../modules/nf-core/gatk4/haplotypecaller/main'
 include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk4/genomicsdbimport/main'
 include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk4/genotypegvcfs/main'
@@ -828,6 +829,53 @@ workflow PLASMOVAR {
         // TODO sarek alternative approach: https://github.com/nf-core/sarek/blob/master/modules/local/create_intervals_bed/main.nf
         // https://github.com/nf-core/sarek/blob/master/subworkflows/local/prepare_intervals/main.nf
         // https://github.com/nf-core/sarek/blob/master/subworkflows/local/bam_variant_calling_haplotypecaller/main.nf
+
+        // TODO: compare interval approach with https://github.com/nf-core/genomicrelatedness/blob/dev/modules/local/splitintervals/main.nf
+        // seems to split multiple times inside each subworkflow
+
+        // Base Quality Score Recalibration (BQSR)
+        if (params.run_bqsr ==  true) {
+            // Check if required files are supplied
+            if (!params.bqsr_known_sites_vcf || !params.bqsr_known_sites_tbi) {
+                log.error("bqsr_known_sites_vcf and bqsr_known_sites_tbi were not provided, but they are required when enabling base quality score recalibration (bqsr).")
+                error "Stopping pipeline. Please provide missing files."
+            }
+
+            BQSR(
+                ch_bam_bai_intervals,
+                ch_ref_fasta,
+                ch_ref_fai,
+                ch_ref_dict,
+                params.bqsr_known_sites_vcf,
+                params.bqsr_known_sites_tbi,
+            )
+
+            // Prepare channel for HaplotypeCaller by recombining bam files with intervals
+            ch_bam_bai_intervals = BQSR.out.bam_recalibrated
+                .join(BQSR.out.bai_recalibrated, by: 0)
+                .combine(ch_intervals)
+                // re-add meta fields that were omitted during scatter-gather operations in BQSR
+                .map { recalibrated_bam_meta, bam, bai, interval_genome_meta, interval ->
+                    def combined_meta = recalibrated_bam_meta + [
+                        id: "${recalibrated_bam_meta.id}_${interval.simpleName}",
+                        genome_id: interval_genome_meta.id,
+                        interval_name: interval.simpleName
+                    ]
+                    [ combined_meta, bam, bai, interval ]
+                }
+
+        // TODO: is it useful to add BQSR or not?
+        // See concerns:
+        // - https://pmc.ncbi.nlm.nih.gov/articles/PMC5048557/
+        // - https://github.com/google/deepvariant/blob/r1.8/docs/deepvariant-details.md#input-assumptions
+        // > Running BQSR results in a small decrease in accuracy => deepvariant was trained on raw scores, so might not apply to GATK
+        // >  Modern base quality is well calibrated. At the standard 30x coverage, minor quality changes also barely matter. This is why all companies are binning quality. Illumina has done extensive evaluation and confirmed the effectiveness of binning. While raw base quality is estimated from signals and is not biased towards samples, BQSR introduces sample biases and reference biases. I have seen it shifts overall properties of the calls. BQSR also completely defeats the purpose of binning and doubles file sizes. I couldn't find papers showing BQSR is beneficial. GIAB folks, the group understands variant calling most, rarely runs BQSR, either. Don't waste your resources.
+
+        // TODO: compare with two-pass approach https://github.com/nf-core/genomicrelatedness/blob/dev/subworkflows/local/base_quality_score_recalibration/main.nf
+        // TODO: https://gatk.broadinstitute.org/hc/en-us/articles/360037433771-GatherBQSRReports
+        // TODO: https://gatk.broadinstitute.org/hc/en-us/articles/360037066912-AnalyzeCovariates
+        // cf. https://github.com/nf-core/genomicrelatedness/
+        }
 
         // Process each sample x interval combination in parallel with HaplotpeCaller
         // Group GVCFs for all samples per interval for GenomicsDBImport
