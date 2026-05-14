@@ -49,7 +49,6 @@ include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk
 include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk4/genotypegvcfs/main'
 include { GATK4_MERGEVCFS                        } from '../modules/nf-core/gatk4/mergevcfs/main'
 include { VARIANT_FILTERING_HARD                 } from '../subworkflows/local/variant_filtering_hard/main.nf'
-include { TABIX_TABIX                            } from '../modules/nf-core/tabix/tabix/main'
 // Variant annotation
 include { SNPEFF_BUILD                           } from '../modules/local/snpeff/build/main'
 include { SNPEFF_ANNOTATE                        } from '../modules/local/snpeff/annotate/main'
@@ -767,6 +766,10 @@ workflow PLASMOVAR {
 
     if (!skip_variantcalling && !skip_alignment) {
 
+        // TODO: refactor into subworkflow
+
+        // TODO: compare with approach used here https://github.com/nf-core/genomicrelatedness/blob/dev/subworkflows/local/combine_cram_crai_intervals/main.nf
+
         //
         // Prepare intervals for scatter-gather processing
         //
@@ -816,7 +819,7 @@ workflow PLASMOVAR {
                 ]
                 [ combined_meta, bam, bai, interval ]
             }
-            // [ [combined_meta.id, combined_meta.sample, combined_meta.num_entries, combined_meta.multiple_lanes, combined_meta.multiple_libraries, combined_meta.data_type, combined_meta.genome_id, combined_meta.interval_name], bam, bai, interval_list, [] ]
+            // [ [combined_meta.id, combined_meta.sample, combined_meta.num_entries, combined_meta.multiple_lanes, combined_meta.multiple_libraries, combined_meta.data_type, combined_meta.genome_id, combined_meta.interval_name], bam, bai, interval_list ]
 
         // TODO: check if bed or interval_list is preferred
 
@@ -968,15 +971,6 @@ workflow PLASMOVAR {
         ch_versions = ch_versions.mix(GATK4_MERGEVCFS.out.versions)
         ch_final_vcf = GATK4_MERGEVCFS.out.vcf      // [[meta], merged.vcf.gz]
         ch_final_vcf_tbi = GATK4_MERGEVCFS.out.tbi  // [[meta], merged.vcf.gz.tbi]
-
-        //
-        // Module: TABIX_TABIX
-        // Index the final merged VCF
-        //
-        // Or use bcftools? https://nf-co.re/modules/bcftools_index/
-        TABIX_TABIX(ch_final_vcf)
-        ch_final_vcf_tbi = TABIX_TABIX.out.index
-        // TODO not required?
     }
 
 
