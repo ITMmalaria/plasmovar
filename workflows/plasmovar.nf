@@ -50,6 +50,7 @@ include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk
 include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk4/genotypegvcfs/main'
 // Variant filtering
 include { VARIANT_FILTERING_HARD                 } from '../subworkflows/local/variant_filtering_hard/main.nf'
+include { VARIANT_FILTERING_VQSR                 } from '../subworkflows/local/variant_filtering_vqsr/main.nf'
 // Variant annotation
 include { SNPEFF_BUILD                           } from '../modules/local/snpeff/build/main'
 include { SNPEFF_ANNOTATE                        } from '../modules/local/snpeff/annotate/main'
@@ -993,9 +994,17 @@ workflow PLASMOVAR {
             // TODO: add parameters to nextflow_schema.json
 
         } else if (params.vcf_filter_mode == 'vqsr' || params.vcf_filter_mode == 'VQSR') {
+            // Some aspects of the VQSR approach were adapted from the MalariaGEN Pf8 pipeline: https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/master/main.nf
+            VARIANT_FILTERING_VQSR(
+                ch_vcf_by_interval.join(ch_vcf_tbi_by_interval),    // [[meta], vcf, tbi]
+                ch_ref_fasta,
+                ch_ref_fai,
+                ch_ref_dict
+            )
+            ch_final_vcf = VARIANT_FILTERING_VQSR.out.vcf_filter_added          // [[meta], gathered.vcf.gz]
+            ch_final_vcf_tbi = VARIANT_FILTERING_VQSR.out.vcf_filter_added_tbi  // [[meta], gathered.vcf.gz.tbi]
         }
     }
-
     // TODO add BQSR
 
     // TODO: add VQSR + hard filtering

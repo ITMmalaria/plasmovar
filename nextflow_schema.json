@@ -478,21 +478,21 @@
                 },
                 "vcf_filter_snp_QD_name": {
                     "type": "string",
-                    "default": "QD+2",
+                    "default": "QD-2",
                     "description": "Filter name for QD filter.",
                     "fa_icon": "fas fa-tag",
                     "help_text": "Name assigned to variants that fail the QD filter."
                 },
                 "vcf_filter_snp_QUAL_filter": {
                     "type": "string",
-                    "default": "",
+                    "default": null,
                     "description": "QUAL (Quality) filter expression for SNPs.",
                     "fa_icon": "fas fa-filter",
                     "help_text": "Filter expression for SNP QUAL metric during hard filtering. Set to empty string to disable this filter."
                 },
                 "vcf_filter_snp_QUAL_name": {
                     "type": "string",
-                    "default": "",
+                    "default": null,
                     "description": "Filter name for QUAL filter.",
                     "fa_icon": "fas fa-tag",
                     "help_text": "Name assigned to variants that fail the QUAL filter."
@@ -583,14 +583,14 @@
                 },
                 "vcf_filter_indel_QUAL_filter": {
                     "type": "string",
-                    "default": "",
+                    "default": null,
                     "description": "QUAL (Quality) filter expression for INDELs.",
                     "fa_icon": "fas fa-filter",
                     "help_text": "Filter expression for INDEL QUAL metric during hard filtering. Set to empty string to disable this filter."
                 },
                 "vcf_filter_indel_QUAL_name": {
                     "type": "string",
-                    "default": "",
+                    "default": null,
                     "description": "Filter name for INDEL QUAL filter.",
                     "fa_icon": "fas fa-tag",
                     "help_text": "Name assigned to INDELs that fail the QUAL filter."
@@ -650,6 +650,66 @@
                     "description": "Filter name for INDEL InbreedingCoeff filter.",
                     "fa_icon": "fas fa-tag",
                     "help_text": "Name assigned to INDELs that fail the InbreedingCoeff filter."
+                },
+                "vqsr_snp_resource_vcfs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of VCF files to use as training resources for SNP VQSR.",
+                    "help_text": "Array of paths to high-confidence VCF files used for training the SNP variant quality score recalibration model. Should be supplied in the same order as the resource labels. E.g. ['/absolute/path/to/7g8_gb4.combined.final.vcf.gz','/absolute/path/to/hb3_dd2.combined.final.vcf.gz','/absolute/path/to/3d7_hb3.combined.final.vcf.gz',]",
+                    "fa_icon": "fas fa-list"
+                },
+                "vqsr_snp_resource_labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Resource labels for SNP VQSR training files.",
+                    "help_text": "Array of GATK resource specifications for each SNP training VCF. Should be supplied in the same order as the resource VCFs. Format: '--resource:name,known=false,training=true,truth=true,prior=15.0'",
+                    "fa_icon": "fas fa-tags"
+                },
+                "vqsr_snp_annotations": {
+                    "type": "string",
+                    "default": "-an QD -an FS -an SOR -an MQRankSum -an ReadPosRankSum",
+                    "description": "Annotations to use for SNP VQSR model training.",
+                    "help_text": "Variant annotations to use for building the SNP VQSR model. To be supplied as copmlete GATK CLI arguments (e.g., '-an QD -an FS -an SOR')."
+                },
+                "vqsr_snp_tranches": {
+                    "type": "string",
+                    "default": "-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 -tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 90.0",
+                    "description": "Tranches for SNP VQSR model.",
+                    "help_text": "Space-separated list of sensitivity tranches for the SNP VQSR model."
+                },
+                "vqsr_indel_resource_vcfs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of VCF files to use as training resources for INDEL VQSR.",
+                    "help_text": "Array of paths to high-confidence VCF files used for training the INDEL variant quality score recalibration model. Should be supplied in the same order as the resource labels.",
+                    "fa_icon": "fas fa-list"
+                },
+                "vqsr_indel_resource_labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Resource labels for INDEL VQSR training files.",
+                    "help_text": "Array of GATK resource specifications for each INDEL training VCF. Should be supplied in the same order as the resource VCFs. Format: '--resource:name,known=false,training=true,truth=true,prior=15.0'",
+                    "fa_icon": "fas fa-tags"
+                },
+                "vqsr_indel_annotations": {
+                    "type": "string",
+                    "default": "-an QD -an FS -an SOR -an ReadPosRankSum",
+                    "description": "Annotations to use for INDEL VQSR model training.",
+                    "help_text": "Variant annotations to use for building the INDEL VQSR model. To be supplied as complete GATK CLI arguments (e.g., '-an QD -an FS -an SOR')."
+                },
+                "vqsr_indel_tranches": {
+                    "type": "string",
+                    "default": "-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 -tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 90.0",
+                    "description": "Tranches for INDEL VQSR model.",
+                    "help_text": "Space-separated list of sensitivity tranches for the INDEL VQSR model."
                 }
             }
         },

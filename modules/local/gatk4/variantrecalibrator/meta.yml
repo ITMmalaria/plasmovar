@@ -1,0 +1,124 @@
+name: "gatk4_variantrecalibrator"
+description: "Build recalibration model for variant filtering using GATK VariantRecalibrator"
+keywords:
+  - gatk4
+  - vqsr
+  - variant quality score recalibration
+  - variant filtering
+  - snp
+  - indel
+tools:
+  - gatk4:
+      description: |
+        Developed in the Data Sciences Platform at the Broad Institute, the toolkit offers a wide variety of tools
+        with a primary focus on variant discovery and genotyping. Its powerful processing engine
+        and high-performance computing features make it capable of taking on projects of any size.
+      homepage: https://gatk.broadinstitute.org/hc/en-us
+      documentation: https://gatk.broadinstitute.org/hc/en-us/categories/360002369672s
+      doi: 10.1158/1538-7445.AM2017-3590
+      licence: ["Apache-2.0"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing VCF information
+          e.g. `[ id:'vcf_cohort', genome_id:'genome_1' ]`
+    - vcf:
+        type: file
+        description: Input VCF file with variants to be recalibrated
+        pattern: "*.{vcf,vcf.gz}"
+        ontologies:
+          - edam: http://edamontology.org/format_3989 # GZIP format
+    - tbi:
+        type: file
+        description: Index file for input VCF with variants to be recalibrated
+        pattern: "*.{tbi,csi}"
+  - mode:
+      type: string
+      description: Recalibration mode (SNP or INDEL)
+      pattern: "{SNP,INDEL}"
+  - fasta:
+      type: file
+      description: Reference genome FASTA file
+      pattern: "*.{fasta,fa}"
+  - fai:
+      type: file
+      description: Index file for reference genome FASTA
+      pattern: "*.fai"
+  - dict:
+      type: file
+      description: Sequence dictionary file for reference genome
+      pattern: "*.dict"
+  - resource_vcfs:
+      type: file
+      description: List of resource VCF files for training the model
+      pattern: "*.{vcf,vcf.gz}"
+    ontologies:
+        - edam: http://edamontology.org/format_3989 # GZIP format
+  - resource_tbis:
+      type: file
+      description: List of index files for resource VCFs
+      pattern: "*.{tbi,csi}"
+  - resource_labels:
+      type: list
+      description: List of resource labels specifying training parameters for each resource VCF, in same order as resource_vcfs (e.g., "--resource:name,known=false,training=true,truth=true,prior=15.0")
+
+output:
+  recal:
+    - - meta:
+          type: file
+          description: Output recal file to be used by ApplyVQSR
+          pattern: "*.recal"
+          ontologies: []
+      - "*.recal":
+          type: file
+          description: Output recal file to be used by ApplyVQSR
+          pattern: "*.recal"
+          ontologies: []
+  idx:
+    - - meta:
+          type: file
+          description: Index file for the recal output file
+          pattern: "*.idx"
+          ontologies: []
+      - "*.idx":
+          type: file
+          description: Index file for the recal output file
+          pattern: "*.idx"
+          ontologies: []
+  tranches:
+    - - meta:
+          type: file
+          description: Output tranches file used by ApplyVQSR
+          pattern: "*.tranches"
+          ontologies: []
+      - "*.tranches":
+          type: file
+          description: Output tranches file used by ApplyVQSR
+          pattern: "*.tranches"
+          ontologies: []
+  versions_gatk4:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - gatk4:
+          type: string
+          description: The name of the tool
+      - gatk --version | sed -n '/GATK.*v/s/.*v//p':
+          type: eval
+          description: The expression to obtain the version of the tool
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - gatk4:
+          type: string
+          description: The name of the tool
+      - gatk --version | sed -n '/GATK.*v/s/.*v//p':
+          type: eval
+          description: The expression to obtain the version of the tool
+
+authors:
+  - "@pmoris"
