@@ -48,7 +48,7 @@ include { BQSR                                   } from '../subworkflows/local/b
 include { GATK4_HAPLOTYPECALLER                  } from '../modules/nf-core/gatk4/haplotypecaller/main'
 include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk4/genomicsdbimport/main'
 include { GATK4_GENOTYPEGVCFS                    } from '../modules/nf-core/gatk4/genotypegvcfs/main'
-include { GATK4_MERGEVCFS                        } from '../modules/nf-core/gatk4/mergevcfs/main'
+// Variant filtering
 include { VARIANT_FILTERING_HARD                 } from '../subworkflows/local/variant_filtering_hard/main.nf'
 // Variant annotation
 include { SNPEFF_BUILD                           } from '../modules/local/snpeff/build/main'
@@ -981,46 +981,20 @@ workflow PLASMOVAR {
 
         if (params.vcf_filter_mode == 'hard') {
             VARIANT_FILTERING_HARD(
-                ch_vcf_by_interval.join(ch_vcf_tbi_by_interval),
+                ch_vcf_by_interval.join(ch_vcf_tbi_by_interval),    // [[meta], vcf, tbi]
                 ch_ref_fasta,
                 ch_ref_fai,
                 ch_ref_dict,
                 // ch_gzi,
             )
+            ch_final_vcf = VARIANT_FILTERING_HARD.out.vcf_filter_added          // [[meta], gathered.vcf.gz]
+            ch_final_vcf_tbi = VARIANT_FILTERING_HARD.out.vcf_filter_added_tbi  // [[meta], gathered.vcf.gz.tbi]
 
-            ch_vcf_filter_added = VARIANT_FILTERING_HARD.out.vcf_filter_added
+            // TODO: add parameters to nextflow_schema.json
 
         } else if (params.vcf_filter_mode == 'vqsr' || params.vcf_filter_mode == 'VQSR') {
         }
-        // Prepare for VCF merging: collect all interval VCFs
-        // Group by genome_id to merge all intervals for that genome
-        ch_vcfs_to_merge = ch_vcf_filter_added
-            // [ meta, vcf ]    (1 per interval)
-            .map { meta, vcf ->
-                [ meta.genome_id, vcf ]
-            }
-            .groupTuple(by: 0)
-            // [ meta.genome_id, [vcfs] ] (1 element with all interval files)
-            .map { genome_id, vcfs ->
-                def final_meta = [ id: genome_id ]
-                [ final_meta, vcfs ]
-            }
-
-        //
-        // Module: GATK4_MERGEVCFS
-        // Merge interval VCFs into single cohort VCF
-        // Order is handled automatically by the sequence dictionary
-        // (unlike bcftools, see https://nf-co.re/subworkflows/vcf_gather_bcftools)
-        //
-        GATK4_MERGEVCFS(
-            ch_vcfs_to_merge,
-            ch_ref_dict
-        )
-        ch_versions = ch_versions.mix(GATK4_MERGEVCFS.out.versions)
-        ch_final_vcf = GATK4_MERGEVCFS.out.vcf      // [[meta], merged.vcf.gz]
-        ch_final_vcf_tbi = GATK4_MERGEVCFS.out.tbi  // [[meta], merged.vcf.gz.tbi]
     }
-
 
     // TODO add BQSR
 
