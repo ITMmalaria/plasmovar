@@ -468,6 +468,188 @@
                     "enum": ["hard", "vqsr", "VQSR"],
                     "fa_icon": "fas fa-filter",
                     "help_text": "Can be set to either `hard` or `vqsr`."
+                },
+                "vcf_filter_snp_QD_filter": {
+                    "type": "string",
+                    "default": "QD < 2.0",
+                    "description": "QD (Quality by Depth) filter expression for SNPs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for SNP QD metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_snp_QD_name": {
+                    "type": "string",
+                    "default": "QD+2",
+                    "description": "Filter name for QD filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to variants that fail the QD filter."
+                },
+                "vcf_filter_snp_QUAL_filter": {
+                    "type": "string",
+                    "default": "",
+                    "description": "QUAL (Quality) filter expression for SNPs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for SNP QUAL metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_snp_QUAL_name": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Filter name for QUAL filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to variants that fail the QUAL filter."
+                },
+                "vcf_filter_snp_FS_filter": {
+                    "type": "string",
+                    "default": "FS > 60.0",
+                    "description": "FS (FisherStrand) filter expression for SNPs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for SNP FS metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_snp_FS_name": {
+                    "type": "string",
+                    "default": "FS+60",
+                    "description": "Filter name for FS filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to variants that fail the FS filter."
+                },
+                "vcf_filter_snp_ReadPosRankSum_filter": {
+                    "type": "string",
+                    "default": "ReadPosRankSum < -8.0",
+                    "description": "ReadPosRankSum filter expression for SNPs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for SNP ReadPosRankSum metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_snp_ReadPosRankSum_name": {
+                    "type": "string",
+                    "default": "ReadPosRankSum-8",
+                    "description": "Filter name for ReadPosRankSum filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to variants that fail the ReadPosRankSum filter."
+                },
+                "vcf_filter_snp_SOR_filter": {
+                    "type": "string",
+                    "default": "SOR > 3.0",
+                    "description": "SOR (StrandOddsRatio) filter expression for SNPs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for SNP SOR metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_snp_SOR_name": {
+                    "type": "string",
+                    "default": "StrandOddsRatio+3",
+                    "description": "Filter name for SOR filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to variants that fail the SOR filter."
+                },
+                "vcf_filter_snp_MQ_filter": {
+                    "type": "string",
+                    "default": "MQ < 40.0",
+                    "description": "MQ (RMSMappingQuality) filter expression for SNPs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for SNP MQ metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_snp_MQ_name": {
+                    "type": "string",
+                    "default": "MQ-40",
+                    "description": "Filter name for MQ filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to variants that fail the MQ filter."
+                },
+                "vcf_filter_snp_MQRankSum_filter": {
+                    "type": "string",
+                    "default": "MQRankSum < -12.5",
+                    "description": "MQRankSum filter expression for SNPs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for SNP MQRankSum metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_snp_MQRankSum_name": {
+                    "type": "string",
+                    "default": "MQRankSum-12.5",
+                    "description": "Filter name for MQRankSum filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to variants that fail the MQRankSum filter."
+                },
+                "vcf_filter_indel_QD_filter": {
+                    "type": "string",
+                    "default": "QD < 2.0",
+                    "description": "QD (Quality by Depth) filter expression for INDELs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for INDEL QD metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_indel_QD_name": {
+                    "type": "string",
+                    "default": "QD-2",
+                    "description": "Filter name for INDEL QD filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to INDELs that fail the QD filter."
+                },
+                "vcf_filter_indel_QUAL_filter": {
+                    "type": "string",
+                    "default": "",
+                    "description": "QUAL (Quality) filter expression for INDELs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for INDEL QUAL metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_indel_QUAL_name": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Filter name for INDEL QUAL filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to INDELs that fail the QUAL filter."
+                },
+                "vcf_filter_indel_FS_filter": {
+                    "type": "string",
+                    "default": "FS > 200.0",
+                    "description": "FS (FisherStrand) filter expression for INDELs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for INDEL FS metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_indel_FS_name": {
+                    "type": "string",
+                    "default": "FS+200",
+                    "description": "Filter name for INDEL FS filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to INDELs that fail the FS filter."
+                },
+                "vcf_filter_indel_ReadPosRankSum_filter": {
+                    "type": "string",
+                    "default": "ReadPosRankSum < -20.0",
+                    "description": "ReadPosRankSum filter expression for INDELs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for INDEL ReadPosRankSum metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_indel_ReadPosRankSum_name": {
+                    "type": "string",
+                    "default": "ReadPosRankSum-20",
+                    "description": "Filter name for INDEL ReadPosRankSum filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to INDELs that fail the ReadPosRankSum filter."
+                },
+                "vcf_filter_indel_SOR_filter": {
+                    "type": "string",
+                    "default": "SOR > 10.0",
+                    "description": "SOR (StrandOddsRatio) filter expression for INDELs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for INDEL SOR metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_indel_SOR_name": {
+                    "type": "string",
+                    "default": "StrandOddsRatio+10",
+                    "description": "Filter name for INDEL SOR filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to INDELs that fail the SOR filter."
+                },
+                "vcf_filter_indel_InbreedingCoeff_filter": {
+                    "type": "string",
+                    "default": "InbreedingCoeff < -0.8",
+                    "description": "InbreedingCoefficient filter expression for INDELs.",
+                    "fa_icon": "fas fa-filter",
+                    "help_text": "Filter expression for INDEL InbreedingCoeff metric during hard filtering. Set to empty string to disable this filter."
+                },
+                "vcf_filter_indel_InbreedingCoeff_name": {
+                    "type": "string",
+                    "default": "InbreedingCoeff-0.8",
+                    "description": "Filter name for INDEL InbreedingCoeff filter.",
+                    "fa_icon": "fas fa-tag",
+                    "help_text": "Name assigned to INDELs that fail the InbreedingCoeff filter."
                 }
             }
         },
