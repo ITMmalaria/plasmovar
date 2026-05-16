@@ -388,6 +388,39 @@
                 }
             }
         },
+        "bqsr_options": {
+            "title": "Base quality score recalibration options",
+            "type": "object",
+            "description": "Configure options for BQSR.",
+            "fa_icon": "fa-solid fa-refresh",
+            "properties": {
+                "run_bqsr": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Whether to run BQSR or not. Disabled by default.",
+                    "fa_icon": "fas fa-toggle-on",
+                    "help_text": ""
+                },
+                "bqsr_known_sites_vcf": {
+                    "type": "string",
+                    "exists": true,
+                    "pattern": "^\\S+\\.vcf?(\\.gz)?$",
+                    "description": "VCF file with known sites to be used for BQSR.",
+                    "errorMessage": "Input must be a .vcf file (optionally gzipped).",
+                    "fa_icon": "fas fa-file",
+                    "help_text": ""
+                },
+                "bqsr_known_sites_tbi": {
+                    "type": "string",
+                    "exists": true,
+                    "pattern": "^\\S+(\\.vcf)?(\\.gz)?\\.tbi(\\.gz)?$",
+                    "description": "Index file for VCF with known sites to be used for BQSR.",
+                    "errorMessage": "Input must be a .tbi file (optionally gzipped).",
+                    "fa_icon": "fas fa-file",
+                    "help_text": ""
+                }
+            }
+        },
         "gatk_readgroup_options": {
             "title": "GATK Read Group options",
             "type": "object",

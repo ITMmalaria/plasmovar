@@ -36,6 +36,8 @@ workflow PIPELINE_INITIALISATION {
     help_full         // boolean: Show the full help message
     show_hidden       // boolean: Show hidden parameters in the help message
 
+// TODO: check input vs params.input and monochrome_logs options. Might get fixed after nf-core tools update.
+
     main:
 
     ch_versions = channel.empty()
@@ -369,6 +371,14 @@ def extractFlowcellFromFastq(path) {
     // returns null otherwise
     return fcid
 }
+
+// TODO: optionally just return warnings instead of stopping the pipeline. Non-unique entries should still be caught further downstream and this would allow non-standard files to be processed if there is just a single run per sample (or even just no repeated lanes/lib combinations).
+
+// Test cases
+// assert extractLaneFromFilename('sample_L001_R1.fastq.gz') == '001'
+// assert extractLaneFromFilename('sample_L1_R1.fastq.gz') == '001'
+// assert extractLaneFromFilename('sample_lane2_R1.fastq.gz') == '002'
+// assert extractLaneFromFilename('sample_100_R1.fastq.gz') == null  // Not a lane!
 
 //
 // Generate methods description for MultiQC

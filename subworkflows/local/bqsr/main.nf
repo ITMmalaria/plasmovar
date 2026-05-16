@@ -19,8 +19,8 @@ workflow BQSR {
     ch_ref_fasta            // [ [meta], fasta ]
     ch_ref_fai              // [ [meta], fai ]
     ch_ref_dict             // [ [meta], dict]
-    known_sites_vcf         // path
-    known_sites_tbi         // path
+    known_sites_vcf         // path to vcf file
+    known_sites_tbi         // path to vcf tbi file
 
     main:
 

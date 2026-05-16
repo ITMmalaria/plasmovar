@@ -760,6 +760,7 @@ workflow PLASMOVAR {
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.global_txt.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.regions_txt.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.summary_txt.collect{it[1]})
+        // TODO: check behaviour of mosdepth when supplying a restricted list of intervals (e.g. ampliseq + QC metric for genes of interest during WGS)
     }
 
     //
@@ -973,14 +974,22 @@ workflow PLASMOVAR {
             [[:], []]   // dbsnp_tbi (optional)
         )
         ch_versions = ch_versions.mix(GATK4_GENOTYPEGVCFS.out.versions)
-        ch_vcf_by_interval = GATK4_GENOTYPEGVCFS.out.vcf  // [[meta], vcf.gz]
-        ch_vcf_tbi_by_interval = GATK4_GENOTYPEGVCFS.out.tbi
+        ch_vcf_by_interval = GATK4_GENOTYPEGVCFS.out.vcf        // [[meta], vcf.gz] (1 per interval)
+        ch_vcf_tbi_by_interval = GATK4_GENOTYPEGVCFS.out.tbi    // [[meta], vcf.gz.tbi]
 
         //
         // Subworkflow: VARIANT_FILTERING (intervals)
         //
 
         if (params.vcf_filter_mode == 'hard') {
+
+            // TODO: optionally allow for fasta gzi index in case of bgzf compressed fasta file, see https://nf-co.re/modules/gatk4_variantfiltration. Needs to alter VARIANT_FILTERING_HARD input options to accept this
+            // If your pipeline already has ch_gzi from reference preparation, use it.
+            // // Otherwise, default to empty:
+            // def ch_gzi = params.fasta.endsWith('.gz')
+            //     ? channel.of([[id: 'genome'], file("${params.fasta}.gzi")])
+            //     : [[:], []]
+
             VARIANT_FILTERING_HARD(
                 ch_vcf_by_interval.join(ch_vcf_tbi_by_interval),    // [[meta], vcf, tbi]
                 ch_ref_fasta,
@@ -990,8 +999,6 @@ workflow PLASMOVAR {
             )
             ch_final_vcf = VARIANT_FILTERING_HARD.out.vcf_filter_added          // [[meta], gathered.vcf.gz]
             ch_final_vcf_tbi = VARIANT_FILTERING_HARD.out.vcf_filter_added_tbi  // [[meta], gathered.vcf.gz.tbi]
-
-            // TODO: add parameters to nextflow_schema.json
 
         } else if (params.vcf_filter_mode == 'vqsr' || params.vcf_filter_mode == 'VQSR') {
             // Some aspects of the VQSR approach were adapted from the MalariaGEN Pf8 pipeline: https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/master/main.nf
@@ -1051,9 +1058,13 @@ workflow PLASMOVAR {
         ch_multiqc_files = ch_multiqc_files.mix(SNPEFF_ANNOTATE.out.report.collect{it[1]})
     }
 
-    // TODO:     gatk VariantsToTable -V "${ann_dir}/${species}/combined.filter_added.ann.vcf" -F CHROM -F POS -F TYPE -GF GT -O "${ann_dir}/${species}/combined.filter_added.table"
+    // TODO: add step for gatk VariantsToTable -V "${ann_dir}/${species}/combined.filter_added.ann.vcf" -F CHROM -F POS -F TYPE -GF GT -O "${ann_dir}/${species}/combined.filter_added.table"
 
-    // TODO: bcf normalizes
+    // TODO: add bcf normalizes as safety measure?
+
+    // TODO: add CDS/region information to annotation as done by MalariaGEN Pf8? https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/master/modules/variant_annotation.nf
+
+    // TODO: variant filtration as done by MalariaGEN Pf8? https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/master/modules/variant_filtration.nf
 
     //
     // Collate and save software versions
