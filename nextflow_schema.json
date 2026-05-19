@@ -215,10 +215,25 @@
                     "errorMessage": "Input must be a .fna or .fasta file (optionally gzipped).",
                     "fa_icon": "fas fa-file"
                 },
+                "fastp_adapter_sequence": {
+                    "type": "string",
+                    "default": null,
+                    "description": "Optional string to specify adapter for read 1.",
+                    "help_text": "fastp will automatically detect adapters if this is not supplied.",
+                    "fa_icon": "fas fa-cut"
+                },
+                "fastp_adapter_sequence_r2": {
+                    "type": "string",
+                    "default": null,
+                    "description": "Optional string to specify adapter for read 2.",
+                    "help_text": "fastp will automatically detect adapters if this is not supplied.",
+                    "fa_icon": "fas fa-cut"
+                },
                 "fastp_overrepresentation": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable overrepresented sequence analysis (enabled by default)."
+                    "description": "Enable overrepresented sequence analysis (disabled by default).",
+                    "fa_icon": "fas fa-angles-up"
                 },
                 "fastp_trim_poly_g": {
                     "type": "boolean",
@@ -229,35 +244,41 @@
                 },
                 "fastp_qualified_quality_phred": {
                     "type": "integer",
-                    "description": "The quality value that a base is qualified. Used in conjunction with --fastp_unqualified_percent_limit. Fastp default is 15.",
+                    "description": "The minimum quality value that a base needs to meet to be qualified for quality filtering of reads. Used in conjunction with --fastp_unqualified_percent_limit. Fastp default is >= Q15 when omitted.",
                     "fa_icon": "fas fa-chart-line"
                 },
                 "fastp_unqualified_percent_limit": {
                     "type": "integer",
-                    "description": "How many percents of bases are allowed to be unqualified (0-100). Fastp default is 40%.",
+                    "description": "Limits the percentage of bases that are allowed to be unqualified for quality filtering of reads (0-100). Fastp default is 40 percent when omitted.",
                     "fa_icon": "fas fa-percent"
                 },
                 "fastp_length_required": {
                     "type": "integer",
-                    "description": "Reads shorter than this will be discarded.",
+                    "description": "Reads shorter than this will be discarded. Fastp default is 15 bp when omitted.",
                     "fa_icon": "fas fa-ruler"
                 },
                 "fastp_cut_front": {
                     "type": "boolean",
-                    "default": true,
-                    "description": "Enable cutting by quality in the front (5' end).",
+                    "default": false,
+                    "description": "Enable cutting by quality from the front (5' end) using a sliding window.",
                     "fa_icon": "fas fa-cut"
                 },
                 "fastp_cut_tail": {
                     "type": "boolean",
-                    "default": true,
-                    "description": "Enable cutting by quality in the tail (3' end).",
+                    "default": false,
+                    "description": "Enable cutting by quality from the tail (3' end) using a sliding window.",
+                    "fa_icon": "fas fa-cut"
+                },
+                "fastp_cut_right": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable cutting by quality from the front (5' end) using a sliding window and dropping the window and everything to the right.",
                     "fa_icon": "fas fa-cut"
                 },
                 "fastp_disable_adapter_trimming": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Disable adapter trimming.",
+                    "description": "Disable adapter trimming. By default this option is set to false, i.e. adapter trimming is performed.",
                     "fa_icon": "fas fa-ban"
                 },
                 "fastp_extra_args": {
