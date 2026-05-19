@@ -3,9 +3,9 @@ process DEACON_INDEX_DIFF {
     label 'process_low'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/deacon:0.13.2--h7ef3eeb_1':
-        'biocontainers/deacon:0.13.2--h7ef3eeb_0' }"
+        'quay.io/biocontainers/deacon:0.13.2--h7ef3eeb_0' }"
 
     input:
     tuple val(meta_fasta), path(fasta)    // fasta file to subtract from the index
@@ -13,7 +13,7 @@ process DEACON_INDEX_DIFF {
 
     output:
     tuple val(meta_index), path("*.idx"), emit: index
-    path "versions.yml",                  emit: versions
+    tuple val("${task.process}"), val('deacon'), eval('deacon --version | head -n1 | sed "s/deacon //g"'), emit: versions_deacon, topic: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -29,21 +29,11 @@ process DEACON_INDEX_DIFF {
         $args \\
         $index \\
         $fasta > ${prefix}.diff.idx
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        deacon: \$(deacon --version | head -n1 | sed 's/deacon //g')
-    END_VERSIONS
     """
 
     stub:
     def prefix = task.ext.prefix ?: "${fasta.baseName}"
     """
     touch ${prefix}.idx
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        deacon: \$(deacon --version | head -n1 | sed 's/deacon //g')
-    END_VERSIONS
     """
 }

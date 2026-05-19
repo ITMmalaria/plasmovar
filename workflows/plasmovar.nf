@@ -505,7 +505,6 @@ workflow PLASMOVAR {
                 )
 
                 DEACON_INDEX(ch_deacon_fasta)
-                ch_versions = ch_versions.mix(DEACON_INDEX.out.versions.first())
                 ch_deacon_index = DEACON_INDEX.out.index
 
             }
@@ -525,7 +524,6 @@ workflow PLASMOVAR {
             if ( params.hostremoval_deacon_diff ) {
                 log.info("Mask out parasite minimizers from deacon index for host read removal.")
                 DEACON_INDEX_DIFF(ch_ref_fasta, ch_deacon_index)
-                ch_versions = ch_versions.mix(DEACON_INDEX_DIFF.out.versions.first())
                 ch_deacon_index = DEACON_INDEX_DIFF.out.index.map{ meta, index ->
                     def index_id = "${meta.id}_diff_${ref_basename}"
                     [ [ id: index_id ], index ]
@@ -541,7 +539,6 @@ workflow PLASMOVAR {
             // Filter reads using deacon against host index
             DEACON_FILTER(ch_deacon_input)
             ch_fastq_hostremoved = DEACON_FILTER.out.fastq_filtered
-            ch_versions = ch_versions.mix(DEACON_FILTER.out.versions.first())
         }
 
         // Re-run fastQC on host-filtered reads
