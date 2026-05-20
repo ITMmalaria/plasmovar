@@ -745,7 +745,7 @@ workflow PLASMOVAR {
         //
 
         ch_bam_bai_bed = ch_bam_bai.combine(ch_ref_bed.map { _meta, bed -> bed })
-        MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta)
+        MOSDEPTH(ch_bam_bai_bed, ch_ref_fasta, [])
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.per_base_bed.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.regions_bed.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.quantized_bed.collect{it[1]})
