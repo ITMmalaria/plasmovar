@@ -522,7 +522,6 @@ workflow PLASMOVAR {
 
             // Subtract shared minimizers between parasite index and host index (see https://github.com/bede/deacon?tab=readme-ov-file#set-operations)
             if ( params.hostremoval_deacon_diff ) {
-                log.info("Mask out parasite minimizers from deacon index for host read removal.")
                 DEACON_INDEX_DIFF(ch_ref_fasta, ch_deacon_index)
                 ch_deacon_index = DEACON_INDEX_DIFF.out.index.map{ meta, index ->
                     def index_id = "${meta.id}_diff_${ref_basename}"
