@@ -384,6 +384,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Whether to subtract the main reference genome index from the host filter index."
+                },
+                "hostremoval_deacon_abs_threshold": {
+                    "type": "integer",
+                    "default": null,
+                    "description": "Minimum absolute number of minimizer hits for a match in deacon filter. Deacon's default is 2 when omitted."
                 }
             }
         },
