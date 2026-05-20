@@ -12,12 +12,12 @@
                     },
                     "bwa/index": {
                         "branch": "master",
-                        "git_sha": "1c46359c837ef768b004519f535c30378e8289fc",
+                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
                         "installed_by": ["modules"]
                     },
                     "bwa/mem": {
                         "branch": "master",
-                        "git_sha": "1c46359c837ef768b004519f535c30378e8289fc",
+                        "git_sha": "2fb127c8fd13de0adaa676df7169131e45c0b114",
                         "installed_by": ["modules"]
                     },
                     "deacon/filter": {

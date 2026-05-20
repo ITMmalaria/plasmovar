@@ -561,7 +561,6 @@ workflow PLASMOVAR {
     if (!params.reference_index) {
         BWA_INDEX (ch_ref_fasta)
         ch_bwa_index = BWA_INDEX.out.index.collect()    // collect() is required to create a re-usable value channel, otherwise it will only contain a single element which won't be emitted for each of the sample reads in ch_fastq
-        ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
     } else {
         // If pre-made index is provided, check if it matches the supplied reference
         // It should be a path to bwa directory containing *.{amb,ann,btw,pac,sa} files
@@ -673,7 +672,6 @@ workflow PLASMOVAR {
             sort_bam        // markduplicates expects coordinate (or query) sorted input
         )
         ch_bam = BWA_MEM.out.bam
-        ch_versions = ch_versions.mix(BWA_MEM.out.versions.first())
 
     // TODO: optionally enable CRAM output
 
