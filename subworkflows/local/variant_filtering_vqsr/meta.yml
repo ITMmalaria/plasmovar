@@ -1,0 +1,104 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/subworkflows/yaml-schema.json
+
+name: "VARIANT_FILTERING_VQSR"
+description: |
+  Subworkflow to perform variant quality score recalibration (VQSR) using GATK.
+  Interval-level VCFs are gathered, SNP VQSR is trained and applied first,
+  followed by indel VQSR using recalibrated SNP calls as input.
+keywords:
+  - GATK
+  - VQSR
+  - variant recalibration
+  - SNP
+  - indel
+  - scatter-gather
+components:
+  - gatk4/mergevcfs
+  - gatk4/variantrecalibrator
+  - gatk4/applyvqsr
+input:
+  - ch_vcf_by_interval:
+      description: |
+        Channel containing per-interval VCFs (scattered variant calls)
+      structure:
+        - meta:
+            type: map
+            description: Metadata map (must contain genome_id)
+        - vcf:
+            type: file
+            description: Compressed VCF file per interval
+            pattern: "*.vcf.gz"
+        - tbi:
+            type: file
+            description: Tabix index for VCF (tbi)
+            pattern: "*.tbi"
+  - ch_ref_fasta:
+      description: Channel with reference genome FASTA file
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fasta:
+            type: file
+            description: Reference genome FASTA file
+            pattern: "*.{fa,fna,fasta}"
+  - ch_ref_fai:
+      description: Channel with reference genome FASTA index
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fai:
+            type: file
+            description: Reference genome FASTA index file
+            pattern: "*.fai"
+  - ch_ref_dict:
+      description: Channel with reference genome FASTA dict
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - dict:
+            type: file
+            description: Reference genome GATK dictionary file
+            pattern: "*.dict"
+  - snp_resource_vcfs:
+      description: |
+        SNP resource VCF files used for VQSR training.
+      structure:
+        - value:
+            type: string
+            description: Path(s) to SNP resource VCF(s)
+  - indel_resource_vcfs:
+      description: |
+        Indel resource VCF files used for VQSR training.
+      structure:
+        - value:
+            type: string
+            description: Path(s) to indel resource VCF(s)
+
+output:
+  - vcf_filter_added:
+      description: |
+        Channel with cohort VCF (gathered across intervals) with VQSR FILTER annotations (marked, not removed)
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - vcf:
+            type: file
+            description: VQSR-filtered VCF
+            pattern: "*.vcf.gz"
+  - vcf_filter_added_tbi:
+      description: Channel with index for VCF with filter annotations
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - tbi:
+            type: file
+            description: Tabix index file for VCF (tbi)
+            pattern: "*.tbi"
+
+authors:
+  - "@pmoris"

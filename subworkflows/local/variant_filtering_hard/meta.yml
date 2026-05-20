@@ -1,0 +1,112 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/subworkflows/yaml-schema.json
+name: "VARIANT_FILTERING_HARD"
+description: |
+  Subworkflow to perform hard filtering of germline short variants (SNPs and indels).
+  Variants are split by type, filtered independently using GATK VariantFiltration,
+  then recombined and optionally filtered variants are excluded. Final VCFs are
+  merged across intervals using a scatter-gather approach.
+keywords:
+  - GATK
+  - variant filtering
+  - SNP
+  - indel
+  - hard filtering
+  - scatter-gather
+components:
+  - gatk4/selectvariants
+  - gatk4/variantfiltration
+  - gatk4/mergevcfs
+input:
+  - ch_vcf_by_interval:
+      description: |
+        Channel containing per-interval VCFs (scattered variant calls)
+      structure:
+        - meta:
+            type: map
+            description: Metadata map (must contain genome_id)
+        - vcf:
+            type: file
+            description: Compressed VCF file per interval
+            pattern: "*.vcf.gz"
+        - tbi:
+            type: file
+            description: Tabix index for VCF (tbi)
+            pattern: "*.tbi"
+  - ch_ref_fasta:
+      description: Channel with reference genome FASTA file
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fasta:
+            type: file
+            description: Reference genome FASTA file
+            pattern: "*.{fa,fna,fasta}"
+  - ch_ref_fai:
+      description: Channel with reference genome FASTA index
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fai:
+            type: file
+            description: Reference genome FASTA index file
+            pattern: "*.fai"
+  - ch_ref_dict:
+      description: Channel with reference genome FASTA dict
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - dict:
+            type: file
+            description: Reference genome GATK dictionary file
+            pattern: "*.dict"
+
+output:
+  - vcf_filter_added:
+      description: |
+        Channel with cohort VCF (gathered across intervals) with SNPs and indels FILTER annotations (marked, not removed)
+      structure:
+        - meta:
+            type: map
+            description: Metadata map (includes id and genome_id)
+        - vcf:
+            type: file
+            description: Merged VCF with filter annotations
+            pattern: "*.vcf.gz"
+
+  - vcf_filter_added_tbi:
+      description: Index for VCF with filter annotations
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - tbi:
+            type: file
+            description: Tabix index file for VCF (tbi)
+            pattern: "*.tbi"
+  - vcf_filtered:
+      description: |
+        Channel with cohort VCF (gathered across intervals) after exclusion of filtered SNPs and indels
+      structure:
+        - meta:
+            type: map
+            description: Metadata map (includes id and genome_id)
+        - vcf:
+            type: file
+            description: Filtered merged VCF
+            pattern: "*.vcf.gz"
+  - vcf_filtered_tbi:
+      description: Channel with index for filtered cohort VCF
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - tbi:
+            type: file
+            description: Tabix index file for VCF (tbi)
+            pattern: "*.tbi"
+
+authors:
+  - "@pmoris"

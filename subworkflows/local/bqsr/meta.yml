@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/subworkflows/yaml-schema.json
+name: "BQSR"
+description: Subworkflow to run GATK Base Quality Score Recalibration
+keywords:
+  - GATK
+  - BQSR
+  - base quality score recalibration
+components:
+  - gatk4/baserecalibrator
+  - gatk4/gatherbqsrreports
+  - gatk4/applybqsr
+input:
+  - ch_bam_bai_intervals:
+      description: |
+        Channel with BAM files, .bai indexes and scattered interval_list files to operate over
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - bam:
+            type: file
+            description: BAM file
+            pattern: "*.bam"
+        - bai:
+            type: file
+            description: BAM index file
+            pattern: "*.bai"
+        - interval:
+            type: file
+            description: gatk interval list file
+            pattern: "*.interval_list"
+  - ch_ref_fasta:
+      description: Channel with reference genome FASTA file
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fasta:
+            type: file
+            description: Reference genome FASTA file
+            pattern: "*.{fa,fna,fasta}"
+  - ch_ref_fai:
+      description: Channel with reference genome FASTA index
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fai:
+            type: file
+            description: Reference genome FASTA index file
+            pattern: "*.fai"
+  - ch_ref_dict:
+      description: Channel with reference genome FASTA dict
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fai:
+            type: file
+            description: Reference genome GATK dictionary file
+            pattern: "*.dict"
+  - known_sites_vcf:
+      description: VCF file
+      structure:
+        - value:
+            type: string
+            description: file path to VCF file; not a channel with a file type element
+  - known_sites_tbi:
+      description: Tabix index file for VCF (.tbi)
+      structure:
+        - value:
+            type: string
+            description: file path to VCF index file (tbi); not a channel with a file type element
+
+output:
+  - bam:
+      description: Channel containing recalibrated BAM files
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - bam:
+            type: file
+            description: Deduplicated BAM file
+            pattern: "*.bam"
+  - bai:
+      description: Channel containing BAM index (BAI) files
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - bai:
+            type: file
+            description: BAM index file
+            pattern: "*.bai"
+
+authors:
+  - "@pmoris"
