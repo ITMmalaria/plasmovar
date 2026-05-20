@@ -265,12 +265,15 @@ workflow PLASMOVAR {
 
     // Index reference fasta as .fai
     SAMTOOLS_FAIDX(
-        ch_ref_fasta,
-        [[:], []],
+        ch_ref_fasta.map{ meta, fasta -> [ meta, fasta, [] ]},
         []
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
-    ch_ref_fai      = SAMTOOLS_FAIDX.out.fai    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai]
+    ch_ref_fai = SAMTOOLS_FAIDX.out.fai.first() // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai] - will be a value channel because its input is one too
+
+    // create combined channel as input for various downstream processes
+    // explicitly turn into a value channel to avoid downstream issues in e.g. samtools_sort,
+    // even though println ch_ref_fasta.getClass() suggests it already is (groovyx.gpars.dataflow.DataflowVariable)
+    ch_ref_fasta_fai = ch_ref_fasta.join(ch_ref_fai).first()    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz, /path/to/ref.fa.gz.fai]
 
     // Create or read bed file
     if (params.reference_bed) {
@@ -728,20 +731,18 @@ workflow PLASMOVAR {
     // TODO: move into subworkflow?
 
         // Sort and index duplicate marked bam files
-        SAMTOOLS_SORT_MARKDUP(ch_bam_markdup, ch_ref_fasta, 'bai')
+        SAMTOOLS_SORT_MARKDUP(ch_bam_markdup, ch_ref_fasta_fai, 'bai')
         ch_bam_markdup_sort = SAMTOOLS_SORT_MARKDUP.out.bam
-        ch_bam_bai = ch_bam_markdup_sort.join(SAMTOOLS_SORT_MARKDUP.out.bai)
+        ch_bam_bai = ch_bam_markdup_sort.join(SAMTOOLS_SORT_MARKDUP.out.index)
 
-        SAMTOOLS_STATS(ch_bam_bai, ch_ref_fasta)
+        SAMTOOLS_STATS(ch_bam_bai, ch_ref_fasta_fai)
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_STATS.out.stats.collect{it[1]})
 
         SAMTOOLS_FLAGSTAT(ch_bam_bai)
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.flagstat.collect{it[1]})
-        ch_versions = ch_versions.mix(SAMTOOLS_FLAGSTAT.out.versions)
 
         SAMTOOLS_IDXSTATS(ch_bam_bai)
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_IDXSTATS.out.idxstats.collect{it[1]})
-        ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions)
 
         //
         // Module: mosdepth coverage statistics
