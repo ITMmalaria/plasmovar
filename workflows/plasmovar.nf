@@ -698,7 +698,6 @@ workflow PLASMOVAR {
             ch_ref_fai.map{ _meta, fai -> fai }.first()
         )
         ch_multiqc_files = ch_multiqc_files.mix(GATK4_MARKDUPLICATES.out.metrics.collect{it[1]})
-        ch_versions = ch_versions.mix(GATK4_MARKDUPLICATES.out.versions)
         ch_bam_markdup = GATK4_MARKDUPLICATES.out.bam
 
     // TODO check sarek's method of collecting reports...or metrics? https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L447C1-L448C104
@@ -788,12 +787,10 @@ workflow PLASMOVAR {
 
         // Create GATK dictionary
         GATK4_CREATESEQUENCEDICTIONARY(ch_ref_fasta)
-        ch_versions = ch_versions.mix(GATK4_CREATESEQUENCEDICTIONARY.out.versions)
         ch_ref_dict = GATK4_CREATESEQUENCEDICTIONARY.out.dict
 
         // Convert BED to GATK IntervalList
         GATK4_BEDTOINTERVALLIST(ch_ref_bed, ch_ref_dict)
-        ch_versions = ch_versions.mix(GATK4_BEDTOINTERVALLIST.out.versions)
 
         // TODO: consider using https://gatk.broadinstitute.org/hc/en-us/articles/9570421542811-ScatterIntervalsByNs-Picard and https://nf-co.re/modules/picard_scatterintervalsbyns/
 
@@ -801,7 +798,6 @@ workflow PLASMOVAR {
 
         // Split chrom/contigs into separate interval_list files for scatter-gather parallel processing
         GATK4_INTERVALLISTTOOLS(GATK4_BEDTOINTERVALLIST.out.interval_list)
-        ch_versions = ch_versions.mix(GATK4_INTERVALLISTTOOLS.out.versions)
         ch_intervals = GATK4_INTERVALLISTTOOLS.out.interval_list
             // [ [interval_genome_meta.id], [interval_list, interval_list, ...] ] (single element)
             .transpose()
@@ -894,7 +890,6 @@ workflow PLASMOVAR {
             [[:], []],  // dbsnp (optional)
             [[:], []]   // dbsnp_tbi (optional)
         )
-        ch_versions = ch_versions.mix(GATK4_HAPLOTYPECALLER.out.versions)
         ch_gvcf = GATK4_HAPLOTYPECALLER.out.vcf      // [[meta], vcf.gz]
         ch_gvcf_tbi = GATK4_HAPLOTYPECALLER.out.tbi  // [[meta], tbi]
 
@@ -943,7 +938,6 @@ workflow PLASMOVAR {
             false,  // run_updatewspace
             false   // input_map
         )
-        ch_versions = ch_versions.mix(GATK4_GENOMICSDBIMPORT.out.versions)
         ch_genomicsdb = GATK4_GENOMICSDBIMPORT.out.genomicsdb  // [[meta], genomicsdb_dir]
 
         // Prepare channels for GenotypeGVCFs by matching genomicsdb with corresponding interval file
@@ -970,7 +964,6 @@ workflow PLASMOVAR {
             [[:], []],  // dbsnp (optional)
             [[:], []]   // dbsnp_tbi (optional)
         )
-        ch_versions = ch_versions.mix(GATK4_GENOTYPEGVCFS.out.versions)
         ch_vcf_by_interval = GATK4_GENOTYPEGVCFS.out.vcf        // [[meta], vcf.gz] (1 per interval)
         ch_vcf_tbi_by_interval = GATK4_GENOTYPEGVCFS.out.tbi    // [[meta], vcf.gz.tbi]
 
