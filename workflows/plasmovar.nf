@@ -798,6 +798,8 @@ workflow PLASMOVAR {
         GATK4_BEDTOINTERVALLIST(ch_ref_bed, ch_ref_dict)
         ch_versions = ch_versions.mix(GATK4_BEDTOINTERVALLIST.out.versions)
 
+        // TODO: consider using https://gatk.broadinstitute.org/hc/en-us/articles/9570421542811-ScatterIntervalsByNs-Picard and https://nf-co.re/modules/picard_scatterintervalsbyns/
+
         // TODO: add simpler strategy that just splits bed file into 1 task per contig + add more meta data about contig name
 
         // Split chrom/contigs into separate interval_list files for scatter-gather parallel processing
@@ -848,6 +850,7 @@ workflow PLASMOVAR {
                 params.bqsr_known_sites_vcf,
                 params.bqsr_known_sites_tbi,
             )
+            // TODO: add table output to multiqc channel
 
             // Prepare channel for HaplotypeCaller by recombining bam files with intervals
             ch_bam_bai_intervals = BQSR.out.bam_recalibrated
@@ -979,6 +982,7 @@ workflow PLASMOVAR {
         //
 
         if (params.vcf_filter_mode == 'hard') {
+            //! TODO: check if order of intervals is as expected
 
             // TODO: optionally allow for fasta gzi index in case of bgzf compressed fasta file, see https://nf-co.re/modules/gatk4_variantfiltration. Needs to alter VARIANT_FILTERING_HARD input options to accept this
             // If your pipeline already has ch_gzi from reference preparation, use it.
