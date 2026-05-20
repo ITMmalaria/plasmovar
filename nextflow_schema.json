@@ -239,7 +239,7 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Enable polyG tail trimming.",
-                    "help_text": "Enabled by default for NextSeq/NovaSeq data. See: https://github.com/OpenGene/fastp?tab=readme-ov-file#polyg-tail-trimming",
+                    "help_text": "When setting this to false, it will still be enabled by default for NextSeq/NovaSeq data. See: https://github.com/OpenGene/fastp?tab=readme-ov-file#polyg-tail-trimming. To completely disable polyG trimming for all inputs, pass `--disable_trim_poly_g` as an argument to `--fastp_extra_args`.",
                     "fa_icon": "fas fa-cut"
                 },
                 "fastp_qualified_quality_phred": {
