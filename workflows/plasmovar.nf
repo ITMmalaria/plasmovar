@@ -338,7 +338,6 @@ workflow PLASMOVAR {
             params.fastp_save_merged
         )
         ch_fastq_trimmed = FASTP.out.reads
-        ch_versions = ch_versions.mix(FASTP.out.versions.first())
         ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
 
         // Re-run fastQC on trimmed reads
