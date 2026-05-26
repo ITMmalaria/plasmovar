@@ -456,7 +456,6 @@ workflow PLASMOVAR {
                     true            // only perform index building step
                 )
                 ch_bbsplit_index = BBMAP_BBSPLIT_INDEXER.out.index
-                ch_versions = ch_versions.mix(BBMAP_BBSPLIT_INDEXER.out.versions.first())
                 // bbsplit.sh -Xmx6000M ref_primary="/path/to/primary_genome.fasta"  ref_human="/path/to/contaminant_genome.fa.gz" path=bbsplit_index_output threads=4
             }
             // Retrieve host index from input parameters otherwise
@@ -481,7 +480,6 @@ workflow PLASMOVAR {
                 false               // do not build a new index
             )
             ch_fastq_hostremoved = BBMAP_BBSPLIT_MAPPER.out.primary_fastq
-            ch_versions = ch_versions.mix(BBMAP_BBSPLIT_MAPPER.out.versions.first())
             ch_multiqc_files = ch_multiqc_files.mix(BBMAP_BBSPLIT_MAPPER.out.stats.collect{it[1]})
         }
 
