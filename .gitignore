@@ -10,3 +10,4 @@ null/
 *.code-workspace
 .nf-test*
 .nf-test/
+.lineage/
