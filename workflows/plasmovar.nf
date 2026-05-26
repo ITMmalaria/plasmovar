@@ -563,83 +563,47 @@ workflow PLASMOVAR {
         BWA_INDEX (ch_ref_fasta)
         ch_bwa_index = BWA_INDEX.out.index.collect()    // collect() is required to create a re-usable value channel, otherwise it will only contain a single element which won't be emitted for each of the sample reads in ch_fastq
     } else {
-        // If pre-made index is provided, check if it matches the supplied reference
-        // It should be a path to bwa directory containing *.{amb,ann,btw,pac,sa} files
-
+        // If pre-made index is provided, check if it matches the supplied reference fasta
+        // It should be a path to bwa directory containing *.{amb,ann,btw,pac,sa} files that share the same basename as the ref
         def index_dir = file(params.reference_index, checkIfExists: true)
         def required_extensions = ['amb', 'ann', 'bwt', 'pac', 'sa']
 
-        // Collect index files matching the reference basename
-        // def index_files = required_extensions.collect { ext ->
-        //     file("${index_dir}/${ref_basename}*.${ext}", glob: true)
-        //     // glob is required to handle names like reference.fa.amb vs reference.amb
-        // }
-
+        // Look for index files matching the reference basename
         def index_files = required_extensions.collectMany { ext ->
-            def matches = file("${index_dir}/${ref_basename}*.${ext}", glob: true)
-            // glob is required to handle names like reference.fa.amb vs reference.amb
-            // in case of no glob results, we still need to return an (empty) list
-            matches instanceof List ? matches : [matches]
+            file("${index_dir}/${ref_basename}*.${ext}", glob: true).toList()
         }
 
-        // println "DEBUG: Found ${index_files.size()} files with glob pattern ${ref_basename}*"
-            // index_files.each { println "DEBUG:   - ${it.name}" }
-
+        // Warn if no index files are found at all
         if (index_files.isEmpty()) {
             error """
-            No BWA index files found for reference '${ref}' in ${index_dir}
-
-            Expected files matching pattern: ${ref_basename}*.{amb,ann,bwt,pac,sa}
-
-            Please ensure:
-            1. The index directory contains BWA index files
-            2. Index file basenames start with: ${ref_basename}
-            3. Index was built using: bwa index ${ref}
+            Incomplete BWA index for ${ref} in ${index_dir}
+            Expected: ${ref_basename}*.{amb,ann,bwt,pac,sa}
             """.stripIndent()
         }
 
-        // extract index basename
-        def basenames = index_files.collect { it.baseName }.unique()
-
-        // println "DEBUG: Unique basenames found: ${basenames}"
+        // Warn if there are multiple unique basenames
+        // This is required because the bwa/mem module uses a find command to retrieve `amb` files
+        def basenames = index_files.collect { file -> file.baseName }.unique()
 
         if (basenames.size() > 1) {
             error """
-            Multiple index file basenames found matching '${ref_basename}*' in ${index_dir}
-            Found basenames: ${basenames.join(', ')}
-
-            Matching files:
-            ${index_files.collect { "  - ${it.name}" }.join('\n')}
-
+            Expected exactly one BWA index with basename '${ref_basename}' in ${index_dir}, but found: ${basenames.join(', ')}
+            Matching files: ${index_files.collect { file -> "${file.name}" }.join(', ')}
             Please ensure only one set of index files matches the reference basename pattern.
             """.stripIndent()
         }
 
-        // check if all expected files are present
         def index_basename = basenames[0]
 
-        // println "DEBUG: Using index basename: ${index_basename}"
-
-        def expected_files = required_extensions.collect { ext ->
-            file("${index_dir}/${index_basename}.${ext}")
+        // Check if all expected index files are present
+        def missing_files = required_extensions.findAll { ext ->
+            !file("${index_dir}/${index_basename}.${ext}").exists()
         }
-        def missing_files = expected_files.findAll { !it.exists() }
-        def existing_files = expected_files.findAll { it.exists() }
-
-        // println "DEBUG: Expected files:"
-        //     expected_files.each { println "DEBUG:   - ${it.name} (exists: ${it.exists()})" }
-
-        if (!missing_files.isEmpty()) {
+        if (missing_files) {
             error """
             Incomplete BWA index for '${index_basename}' in ${index_dir}
-
-            Missing files:
-            ${missing_files.collect { "  - ${it.name}" }.join('\n')}
-
-            Found files:
-            ${existing_files.collect { "  - ${it.name}" }.join('\n')}
-
             A complete BWA index requires all 5 files: ${index_basename}.{amb,ann,bwt,pac,sa}
+            Missing files: ${missing_files.join(', ')}
             Please rebuild the index using: bwa index ${ref}
             """.stripIndent()
         }
@@ -649,16 +613,6 @@ workflow PLASMOVAR {
             [ id: index_basename ],
             index_dir
         ])
-
-        // Alternative option using channel.of, requires collect() to create value channel, but the type changes to a list => not preferred
-        // ch_bwa_index = channel.of(
-        //     tuple(
-        //         [ id: file(params.reference_fasta).simpleName ],
-        //         file(params.reference_index, checkIfExists: true)
-        //     )
-        // ).collect()
-        // ch_bwa_index = channel.fromPath(params.reference_fasta)
-        //     .map( { ref ->  tuple([ id: ref.simpleName ], file(params.reference_index, checkIfExists: true)) } ).collect()
     }
 
     //
