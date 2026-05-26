@@ -1,0 +1,51 @@
+name: seqkit_fastq_sort
+
+description: |
+  Sorts FASTQ reads using seqkit prior to alignment,
+  while preserving correct pairing of paired-end reads.
+  This is required to ensure deterministic behavior in downstream
+  alignment tools such as bwa mem.
+
+keywords:
+  - fastq
+  - seqkit
+  - bwa
+  - sorting
+  - paired-end
+  - determinism
+
+components:
+  - seqkit/sort
+
+input:
+  - ch_fastq:
+      description: |
+        Channel of FASTQ files (PE or SE) to sort.
+        Structure: [ meta, [fq_r1, fq_r2] ]
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fastq:
+              type: file
+              description: FASTQ file
+              pattern: "*.{fq,fq.gz,fastq,fastq.gz}"
+
+output:
+  - fastq_sorted:
+      description: |
+        Channel of sorted FASTQ files (PE or SE):
+        Paired-end reads are guaranteed to be ordered as:
+        R1 first, R2 second.
+        Structure: [ meta, [fq_r1, fq_r2] ] or [ meta, [fq] ]
+      structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - fastq:
+              type: file
+              description: FASTQ file
+              pattern: "*.{fq,fq.gz,fastq,fastq.gz}"
+
+authors:
+  - "@pmoris"
