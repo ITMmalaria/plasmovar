@@ -1,3 +1,5 @@
+nf_core_version: 4.0.2
+repository_type: pipeline
 lint:
   files_exist:
     - conf/igenomes.config
@@ -25,22 +27,20 @@ lint:
   nextflow_config:
     - manifest.name
     - manifest.homePage
-nf_core_version: 4.0.2
-repository_type: pipeline
 template:
   author: Pieter Moris
-  description: A short variant calling pipeline for malaria molecular surveillance
+  description: A short-read variant calling pipeline for malaria molecular surveillance
   force: false
   is_nfcore: false
   name: plasmovar
-  org: pmoris
+  org: ITMmalaria
   outdir: .
   skip_features:
-    - adaptivecard
     - codespaces
+    - email
     - gpu
     - igenomes
     - seqera_platform
-    - slackreport
     - vscode
-  version: 1.0.0dev
+  version: 0.1.0
+  # https://nf-co.re/docs/specifications/pipelines/requirements/semantic_versioning
