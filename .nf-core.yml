@@ -1,26 +1,45 @@
 lint:
   files_exist:
-  - CODE_OF_CONDUCT.md
-  - assets/nf-core-plasmovar_logo_light.png
-  - docs/images/nf-core-plasmovar_logo_light.png
-  - docs/images/nf-core-plasmovar_logo_dark.png
-  - .github/ISSUE_TEMPLATE/config.yml
-  - .github/workflows/awstest.yml
-  - .github/workflows/awsfulltest.yml
-  - conf/igenomes.config
+    - conf/igenomes.config
+    - conf/igenomes_ignored.config
+    - CODE_OF_CONDUCT.md
+    - assets/nf-core-plasmovar_logo_light.png
+    - docs/images/nf-core-plasmovar_logo_light.png
+    - docs/images/nf-core-plasmovar_logo_dark.png
+    - .github/ISSUE_TEMPLATE/config.yml
+    - .github/workflows/awstest.yml
+    - .github/workflows/awsfulltest.yml
   files_unchanged:
-  - CODE_OF_CONDUCT.md
-  - assets/nf-core-plasmovar_logo_light.png
-  - docs/images/nf-core-plasmovar_logo_light.png
-  - docs/images/nf-core-plasmovar_logo_dark.png
-  - .github/ISSUE_TEMPLATE/bug_report.yml
+    - CODE_OF_CONDUCT.md
+    - assets/nf-core-plasmovar_logo_light.png
+    - docs/images/nf-core-plasmovar_logo_light.png
+    - docs/images/nf-core-plasmovar_logo_dark.png
+    - .github/ISSUE_TEMPLATE/bug_report.yml
+    - .github/CONTRIBUTING.md
+    - .github/PULL_REQUEST_TEMPLATE.md
+    - assets/email_template.txt
+    - docs/README.md
+    - .prettierignore
   multiqc_config:
-  - report_comment
+    - report_comment
   nextflow_config:
-  - manifest.name
-  - manifest.homePage
+    - manifest.name
+    - manifest.homePage
+nf_core_version: 4.0.2
 repository_type: pipeline
 template:
-  prefix: pmoris
-  skip:
-  - igenomes
+  author: Pieter Moris
+  description: A short-read variant calling pipeline for malaria molecular surveillance
+  force: false
+  is_nfcore: false
+  name: plasmovar
+  org: ITMmalaria
+  outdir: .
+  skip_features:
+    - codespaces
+    - email
+    - gpu
+    - igenomes
+    - seqera_platform
+    - vscode
+  version: 0.1.0

@@ -1,13 +1,11 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    pmoris/plasmovar
+    ITMmalaria/plasmovar
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/pmoris/plasmovar
+    Github : https://github.com/ITMmalaria/plasmovar
 ----------------------------------------------------------------------------------------
 */
-
-nextflow.enable.dsl = 2
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -18,7 +16,6 @@ nextflow.enable.dsl = 2
 include { PLASMOVAR  } from './workflows/plasmovar'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_plasmovar_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_plasmovar_pipeline'
-
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     NAMED WORKFLOWS FOR PIPELINE
@@ -28,7 +25,7 @@ include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_plas
 //
 // WORKFLOW: Run main analysis pipeline depending on type of input
 //
-workflow PMORIS_PLASMOVAR {
+workflow ITMMALARIA_PLASMOVAR {
 
     take:
     samplesheet // channel: samplesheet read in from --input
@@ -39,12 +36,14 @@ workflow PMORIS_PLASMOVAR {
     // WORKFLOW: Run pipeline
     //
     PLASMOVAR (
-        samplesheet
+        samplesheet,
+        params.multiqc_config,
+        params.multiqc_logo,
+        params.multiqc_methods_description,
+        params.outdir,
     )
-
     emit:
     multiqc_report = PLASMOVAR.out.multiqc_report // channel: /path/to/multiqc_report.html
-
 }
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -55,38 +54,32 @@ workflow PMORIS_PLASMOVAR {
 workflow {
 
     main:
-
     //
     // SUBWORKFLOW: Run initialisation tasks
     //
     PIPELINE_INITIALISATION (
         params.version,
-        params.help,
         params.validate_params,
         params.monochrome_logs,
         args,
         params.outdir,
-        params.input
+        params.input,
+        params.help,
+        params.help_full,
+        params.show_hidden
     )
 
     //
     // WORKFLOW: Run main workflow
     //
-    PMORIS_PLASMOVAR (
+    ITMMALARIA_PLASMOVAR (
         PIPELINE_INITIALISATION.out.samplesheet
     )
-
     //
     // SUBWORKFLOW: Run completion tasks
     //
     PIPELINE_COMPLETION (
-        params.email,
-        params.email_on_fail,
-        params.plaintext_email,
-        params.outdir,
         params.monochrome_logs,
-        params.hook_url,
-        PMORIS_PLASMOVAR.out.multiqc_report
     )
 }
 
