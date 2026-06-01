@@ -374,12 +374,22 @@ def extractFlowcellFromFastq(path) {
 // Generate methods description for MultiQC
 //
 def toolCitationText() {
-    // TODO nf-core: Optionally add in-text citation tools to this list.
     // Can use ternary operators to dynamically construct based conditions, e.g. params["run_xyz"] ? "Tool (Foo et al. 2023)" : "",
     // Uncomment function in methodsDescriptionText to render in MultiQC report
     def citation_text = [
             "Tools used in the workflow included:",
             "FastQC (Andrews 2010),",
+            "fastp (Chen et al. 2018),",
+            "FastQ Screen (Wingett and Andrews 2018),",
+            "deacon (Constantinides et al. 2025),",
+            "bbsplit (Bushnell, n.d.),",
+            "SeqKit2 (Shen et al. 2024),",
+            "BWA-MEM (Li 2013),",
+            "Picard Toolkit (Broad Institute 2019),",
+            "SAMtools (Li et al. 2009),",
+            "Mosdepth (Pedersen and Quinlan 2018),",
+            "GATK (Van der Auwera and O'Connor 2020; Poplin et al. 2017),",
+            "SnpEff (Cingolani et al. 2012),",
             "MultiQC (Ewels et al. 2016)",
             "."
         ].join(' ').trim()
@@ -388,12 +398,23 @@ def toolCitationText() {
 }
 
 def toolBibliographyText() {
-    // TODO nf-core: Optionally add bibliographic entries to this list.
     // Can use ternary operators to dynamically construct based conditions, e.g. params["run_xyz"] ? "<li>Author (2023) Pub name, Journal, DOI</li>" : "",
     // Uncomment function in methodsDescriptionText to render in MultiQC report
     def reference_text = [
-            "<li>Andrews S, (2010) FastQC, URL: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/).</li>",
-            "<li>Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics , 32(19), 3047–3048. doi: /10.1093/bioinformatics/btw354</li>"
+            "<li>Andrews, Simon. 2010. FastQC: A Quality Control Tool for High Throughput Sequence Data. Released. https://www.bioinformatics.babraham.ac.uk/projects/fastqc/.</li>",
+            "<li>Chen, Shifu, Yanqing Zhou, Yaru Chen, and Jia Gu. 2018. “Fastp: An Ultra-Fast All-in-One FASTQ Preprocessor.” Bioinformatics 34 (17): i884–90. https://doi.org/10.1093/bioinformatics/bty560.</li>",
+            "<li>Wingett, Steven W., and Simon Andrews. 2018. “FastQ Screen: A Tool for Multi-Genome Mapping and Quality Control.” F1000Research 7 (September): 1338. https://doi.org/10.12688/f1000research.15931.2.</li>",
+            "<li>Constantinides, Bede, John Lees, and Derrick W. Crook. 2025. “Deacon: Fast Sequence Filtering and Contaminant Depletion.” Preprint, Bioinformatics, June 12. https://doi.org/10.1101/2025.06.09.658732.</li>",
+            "<li>Bushnell, Brian. n.d. Bbmap/Bbsplit. https://sourceforge.net/projects/bbmap/.</li>",
+            "<li>Shen, Wei, Botond Sipos, and Liuyang Zhao. 2024. “SeqKit2: A Swiss Army Knife for Sequence and Alignment Processing.” iMeta 3 (3): e191. https://doi.org/10.1002/imt2.191.</li>",
+            "<li>Li, Heng. 2013. “Aligning Sequence Reads, Clone Sequences and Assembly Contigs with BWA-MEM.” arXiv:1303.3997. Version 2. Preprint, arXiv. https://doi.org/10.48550/ARXIV.1303.3997.</li>",
+            "<li>Broad Institute. 2019. Picard Toolkit. Released. https://broadinstitute.github.io/picard/.</li>",
+            "<li>Li, Heng, Bob Handsaker, Alec Wysoker, et al. 2009. “The Sequence Alignment/Map Format and SAMtools.” Bioinformatics 25 (16): 2078–79. https://doi.org/10.1093/bioinformatics/btp352.</li>",
+            "<li>Pedersen, Brent S., and Aaron R. Quinlan. 2018. “Mosdepth: Quick Coverage Calculation for Genomes and Exomes.” Bioinformatics 34 (5): 867–68. https://doi.org/10.1093/bioinformatics/btx699.</li>",
+            "<li>Van Der Auwera, Geraldine A., and Brian D. O’Connor. 2020. Genomics in the Cloud: Using Docker, GATK, and WDL in Terra (1st Edition). 1st ed. O’Reilly Media. https://www.oreilly.com/library/view/genomics-in-the/9781491975183/.</li>",
+            "<li>Poplin, Ryan, Valentin Ruano-Rubio, Mark A. DePristo, et al. 2017. “Scaling Accurate Genetic Variant Discovery to Tens of Thousands of Samples.” Preprint. Genomics, November 14. https://doi.org/10.1101/201178.</li>",
+            "<li>Cingolani, Pablo, Adrian Platts, Le Lily Wang, et al. 2012. “A Program for Annotating and Predicting the Effects of Single Nucleotide Polymorphisms, SnpEff: SNPs in the Genome of Drosophila Melanogaster Strain w1118 ; Iso-2; Iso-3.” Fly 6 (2): 80–92. https://doi.org/10.4161/fly.19695.</li>",
+            "<li>Ewels, Philip, Måns Magnusson, Sverker Lundin, and Max Käller. 2016. “MultiQC: Summarize Analysis Results for Multiple Tools and Samples in a Single Report.” Bioinformatics 32 (19): 3047–48. https://doi.org/10.1093/bioinformatics/btw354.</li>"
         ].join(' ').trim()
 
     return reference_text
@@ -423,9 +444,8 @@ def methodsDescriptionText(mqc_methods_yaml) {
     meta["tool_citations"] = ""
     meta["tool_bibliography"] = ""
 
-    // TODO nf-core: Only uncomment below if logic in toolCitationText/toolBibliographyText has been filled!
-    // meta["tool_citations"] = toolCitationText().replaceAll(", \\.", ".").replaceAll("\\. \\.", ".").replaceAll(", \\.", ".")
-    // meta["tool_bibliography"] = toolBibliographyText()
+    meta["tool_citations"] = toolCitationText().replaceAll(", \\.", ".").replaceAll("\\. \\.", ".").replaceAll(", \\.", ".")
+    meta["tool_bibliography"] = toolBibliographyText()
 
 
     def methods_text = mqc_methods_yaml.text
