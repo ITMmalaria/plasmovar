@@ -1,4 +1,4 @@
-# pmoris/plasmovar: Citations
+# ITMmalaria/plasmovar: Citations
 
 ## [nf-core](https://pubmed.ncbi.nlm.nih.gov/32055031/)
 

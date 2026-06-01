@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    pmoris/plasmovar
+    ITMmalaria/plasmovar
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/pmoris/plasmovar
+    Github : https://github.com/ITMmalaria/plasmovar
 ----------------------------------------------------------------------------------------
 */
 
@@ -25,7 +25,7 @@ include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_plas
 //
 // WORKFLOW: Run main analysis pipeline depending on type of input
 //
-workflow PMORIS_PLASMOVAR {
+workflow ITMMALARIA_PLASMOVAR {
 
     take:
     samplesheet // channel: samplesheet read in from --input
@@ -72,19 +72,14 @@ workflow {
     //
     // WORKFLOW: Run main workflow
     //
-    PMORIS_PLASMOVAR (
+    ITMMALARIA_PLASMOVAR (
         PIPELINE_INITIALISATION.out.samplesheet
     )
     //
     // SUBWORKFLOW: Run completion tasks
     //
     PIPELINE_COMPLETION (
-        params.email,
-        params.email_on_fail,
-        params.plaintext_email,
-        params.outdir,
         params.monochrome_logs,
-        PMORIS_PLASMOVAR.out.multiqc_report
     )
 }
 

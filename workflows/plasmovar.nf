@@ -141,6 +141,7 @@ workflow PLASMOVAR {
     def ch_versions = channel.empty()
     def ch_multiqc_files = channel.empty()
 
+
     //
     // Parse skip_* and only_* options to decide which optional steps will be run
     //

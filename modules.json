@@ -1,6 +1,6 @@
 {
-    "name": "pmoris/plasmovar",
-    "homePage": "https://github.com/pmoris/plasmovar",
+    "name": "ITMmalaria/plasmovar",
+    "homePage": "https://github.com/ITMmalaria/plasmovar",
     "repos": {
         "https://github.com/nf-core/modules.git": {
             "modules": {

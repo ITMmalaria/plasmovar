@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an idea for the pmoris/plasmovar pipeline
+description: Suggest an idea for the ITMmalaria/plasmovar pipeline
 labels: enhancement
 body:
   - type: textarea

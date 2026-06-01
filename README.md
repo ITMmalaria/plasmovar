@@ -1,7 +1,7 @@
-# pmoris/plasmovar
+# ITMmalaria/plasmovar
 
-[![GitHub Actions CI Status](https://github.com/pmoris/plasmovar/actions/workflows/nf-test.yml/badge.svg)](https://github.com/pmoris/plasmovar/actions/workflows/nf-test.yml)
-[![GitHub Actions Linting Status](https://github.com/pmoris/plasmovar/actions/workflows/linting.yml/badge.svg)](https://github.com/pmoris/plasmovar/actions/workflows/linting.yml)[![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
+[![GitHub Actions CI Status](https://github.com/ITMmalaria/plasmovar/actions/workflows/nf-test.yml/badge.svg)](https://github.com/ITMmalaria/plasmovar/actions/workflows/nf-test.yml)
+[![GitHub Actions Linting Status](https://github.com/ITMmalaria/plasmovar/actions/workflows/linting.yml/badge.svg)](https://github.com/ITMmalaria/plasmovar/actions/workflows/linting.yml)[![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
 [![nf-test](https://img.shields.io/badge/unit_tests-nf--test-337ab7.svg)](https://www.nf-test.com)
 
 [![Nextflow](https://img.shields.io/badge/version-%E2%89%A525.10.4-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D&link=https%3A%2F%2Fnextflow.io)](https://www.nextflow.io/)
@@ -9,11 +9,10 @@
 [![run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/en/latest/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
-[![Launch on Seqera Platform](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Seqera%20Platform-%234256e7)](https://cloud.seqera.io/launch?pipeline=https://github.com/pmoris/plasmovar)
 
 ## Introduction
 
-**pmoris/plasmovar** is a bioinformatics pipeline that ...
+**ITMmalaria/plasmovar** is a bioinformatics pipeline that ...
 
 <!-- TODO nf-core:
    Complete this sentence with a 2-3 sentence summary of what types of data the pipeline ingests, a brief overview of the
@@ -51,7 +50,7 @@ Now, you can run the pipeline using:
 <!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
 
 ```bash
-nextflow run pmoris/plasmovar \
+nextflow run ITMmalaria/plasmovar \
    -profile <docker/singularity/.../institute> \
    --input samplesheet.csv \
    --outdir <OUTDIR>
@@ -62,7 +61,7 @@ nextflow run pmoris/plasmovar \
 
 ## Credits
 
-pmoris/plasmovar was originally written by Pieter Moris.
+ITMmalaria/plasmovar was originally written by Pieter Moris.
 
 We thank the following people for their extensive assistance in the development of this pipeline:
 
@@ -75,7 +74,7 @@ If you would like to contribute to this pipeline, please see the [contributing g
 ## Citations
 
 <!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-<!-- If you use pmoris/plasmovar for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
+<!-- If you use ITMmalaria/plasmovar for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
 
 <!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
 
