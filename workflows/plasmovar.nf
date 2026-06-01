@@ -275,12 +275,12 @@ workflow PLASMOVAR {
         ch_ref_fasta.map{ meta, fasta -> [ meta, fasta, [] ]},
         []
     )
-    ch_ref_fai = SAMTOOLS_FAIDX.out.fai.first() // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai] - will be a value channel because its input is one too
+    ch_ref_fai = SAMTOOLS_FAIDX.out.fai.collect() // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai] - will be a value channel because its input is one too
 
     // create combined channel as input for various downstream processes
     // explicitly turn into a value channel to avoid downstream issues in e.g. samtools_sort,
     // even though println ch_ref_fasta.getClass() suggests it already is (groovyx.gpars.dataflow.DataflowVariable)
-    ch_ref_fasta_fai = ch_ref_fasta.join(ch_ref_fai).first()    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz, /path/to/ref.fa.gz.fai]
+    ch_ref_fasta_fai = ch_ref_fasta.join(ch_ref_fai).collect()    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz, /path/to/ref.fa.gz.fai]
 
     // Create or read bed file
     if (params.reference_bed) {
@@ -405,7 +405,7 @@ workflow PLASMOVAR {
 
         // Create FastQ Screen configuration file and directory with index files
         FASTQSCREEN_BUILDFROMINDEX(ch_fastqscreen_indexes, "bwa")
-        ch_versions = ch_versions.mix(FASTQSCREEN_BUILDFROMINDEX.out.versions.first())
+        ch_versions = ch_versions.mix(FASTQSCREEN_BUILDFROMINDEX.out.versions.collect())
         database_ch = FASTQSCREEN_BUILDFROMINDEX.out.database
 
         // Run FastQ Screen on all input reads with the same database
@@ -659,8 +659,8 @@ workflow PLASMOVAR {
 
         GATK4_MARKDUPLICATES(
             ch_bam_grouped,
-            ch_ref_fasta.map{ _meta, fasta -> [ fasta ] }.first(),
-            ch_ref_fai.map{ _meta, fai -> fai }.first()
+            ch_ref_fasta.map{ _meta, fasta -> [ fasta ] }.collect(),
+            ch_ref_fai.map{ _meta, fai -> fai }.collect()
         )
         ch_multiqc_files = ch_multiqc_files.mix(GATK4_MARKDUPLICATES.out.metrics.collect{it[1]})
         ch_bam_markdup = GATK4_MARKDUPLICATES.out.bam
