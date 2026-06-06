@@ -755,6 +755,28 @@
                     "default": "-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 -tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 90.0",
                     "description": "Tranches for INDEL VQSR model.",
                     "help_text": "Space-separated list of sensitivity tranches for the INDEL VQSR model."
+                },
+                "vqsr_snp_max_gaussians": {
+                    "type": "integer",
+                    "description": "Max number of Gaussians for the positive model when recalibrating SNPs.",
+                    "help_text": "When not provided, the GATK default of 8 will be used."
+                },
+                "vqsr_indel_max_gaussians": {
+                    "type": "integer",
+                    "description": "Max number of Gaussians for the positive model when recalibrating INDELs.",
+                    "help_text": "When not provided, the GATK default of 8 will be used."
+                },
+                "vqsr_snp_truth_sensitivity_filter_level": {
+                    "type": "number",
+                    "default": 99.5,
+                    "description": "The truth sensitivity level at which to start filtering during GATK ApplyVQSR in SNP mode.",
+                    "help_text": "Variants in tranches that fall below the specified truth sensitivity filter level have their FILTER field annotated with the corresponding tranche level."
+                },
+                "vqsr_indel_truth_sensitivity_filter_level": {
+                    "type": "number",
+                    "default": 99.5,
+                    "description": "The truth sensitivity level at which to start filtering during GATK ApplyVQSR in INDEL mode.",
+                    "help_text": "Variants in tranches that fall below the specified truth sensitivity filter level have their FILTER field annotated with the corresponding tranche level."
                 }
             }
         },
