@@ -210,14 +210,12 @@
                 },
                 "fastp_adapter_sequence": {
                     "type": "string",
-                    "default": null,
                     "description": "Optional string to specify adapter for read 1.",
                     "help_text": "fastp will automatically detect adapters if this is not supplied.",
                     "fa_icon": "fas fa-cut"
                 },
                 "fastp_adapter_sequence_r2": {
                     "type": "string",
-                    "default": null,
                     "description": "Optional string to specify adapter for read 2.",
                     "help_text": "fastp will automatically detect adapters if this is not supplied.",
                     "fa_icon": "fas fa-cut"
@@ -536,14 +534,12 @@
                 },
                 "vcf_filter_snp_QUAL_filter": {
                     "type": "string",
-                    "default": null,
                     "description": "QUAL (Quality) filter expression for SNPs.",
                     "fa_icon": "fas fa-filter",
                     "help_text": "Filter expression for SNP QUAL metric during hard filtering. Set to empty string to disable this filter."
                 },
                 "vcf_filter_snp_QUAL_name": {
                     "type": "string",
-                    "default": null,
                     "description": "Filter name for QUAL filter.",
                     "fa_icon": "fas fa-tag",
                     "help_text": "Name assigned to variants that fail the QUAL filter."
@@ -634,14 +630,12 @@
                 },
                 "vcf_filter_indel_QUAL_filter": {
                     "type": "string",
-                    "default": null,
                     "description": "QUAL (Quality) filter expression for INDELs.",
                     "fa_icon": "fas fa-filter",
                     "help_text": "Filter expression for INDEL QUAL metric during hard filtering. Set to empty string to disable this filter."
                 },
                 "vcf_filter_indel_QUAL_name": {
                     "type": "string",
-                    "default": null,
                     "description": "Filter name for INDEL QUAL filter.",
                     "fa_icon": "fas fa-tag",
                     "help_text": "Name assigned to INDELs that fail the QUAL filter."
