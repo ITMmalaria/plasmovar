@@ -724,7 +724,7 @@
                     "type": "string",
                     "default": "-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 -tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 90.0",
                     "description": "Tranches for SNP VQSR model.",
-                    "help_text": "Space-separated list of sensitivity tranches for the SNP VQSR model."
+                    "help_text": "List of sensitivity tranches for the SNP VQSR model, in the format -tranche 100.0 -tranche 99.95 ... ."
                 },
                 "vqsr_indel_resource_vcfs": {
                     "type": "array",
@@ -754,7 +754,7 @@
                     "type": "string",
                     "default": "-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 -tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 90.0",
                     "description": "Tranches for INDEL VQSR model.",
-                    "help_text": "Space-separated list of sensitivity tranches for the INDEL VQSR model."
+                    "help_text": "List of sensitivity tranches for the INDEL VQSR model, in the format -tranche 100.0 -tranche 99.95 ... ."
                 },
                 "vqsr_snp_max_gaussians": {
                     "type": "integer",
