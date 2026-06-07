@@ -624,9 +624,11 @@ workflow PLASMOVAR {
     //
     if (!skip_alignment) {
 
-        // Sort fastq reads to make bwa deterministic
-        SEQKIT_FASTQ_SORT(ch_fastq)
-        ch_fastq = SEQKIT_FASTQ_SORT.out.fastq_sorted
+        // Optionally sort fastq reads to make bwa deterministic - can have high memory requirements
+        if (params.sort_fastq) {
+            SEQKIT_FASTQ_SORT(ch_fastq)
+            ch_fastq = SEQKIT_FASTQ_SORT.out.fastq_sorted
+        }
 
         // Run bwa mem and sort resulting bam files
         sort_bam = true
