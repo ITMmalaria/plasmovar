@@ -45,5 +45,5 @@ template:
     - igenomes
     - seqera_platform
     - vscode
-  version: 0.1.0
+  version: 0.2.0
   # https://nf-co.re/docs/specifications/pipelines/requirements/semantic_versioning
