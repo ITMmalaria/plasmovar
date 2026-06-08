@@ -116,7 +116,6 @@ workflow PIPELINE_INITIALISATION {
                     if (detected_flowcell != detected_flowcell_r2) {
                         log.error("""
                             Flowcell ID mismatch for paired reads of sample '${meta.id}'
-
                             Paired-end reads must originate from the same sequencing run.
 
                             Read 1: ${fastq_1}
@@ -127,19 +126,39 @@ workflow PIPELINE_INITIALISATION {
                             """.stripIndent())
                         error("Please check your samplesheet for mismatched FASTQ file pairs.")
                     }
-                meta = meta + [flowcell: detected_flowcell]
                 }
+                meta = meta + [flowcell: detected_flowcell]
             }
             // If flowcell is manually provided, validate it matches FASTQ headers (optional strict mode)
             else if (params.auto_detect_flowcells && meta.flowcell) {
                 def detected_flowcell = extractFlowcellFromFastq(fastq_1)
                 if (detected_flowcell && meta.flowcell != detected_flowcell) {
                     log.warn("""
-                        Manually provided flowcell '${meta.flowcell}' does not match
-                        flowcell '${detected_flowcell}' extracted from FASTQ header in '${fastq_1}'.
-
+                        Manually provided flowcell '${meta.flowcell}'
+                        does not match flowcell '${detected_flowcell}'
+                        extracted from FASTQ header in '${fastq_1}'.
                         Using manually provided value from samplesheet: '${meta.flowcell}'.
                     """.stripIndent())
+                }
+                if (fastq_2) {
+                    def detected_flowcell_r2 = extractFlowcellFromFastq(fastq_2)
+                    if (detected_flowcell &&
+                        detected_flowcell_r2 &&
+                        detected_flowcell != detected_flowcell_r2) {
+                        log.error("""
+                            Flowcell ID mismatch for paired reads of sample '${meta.id}'
+                            Paired-end reads must originate from the same sequencing run.
+
+                            Provided flowcell: ${meta.flowcell}
+
+                            Read 1: ${fastq_1}
+                            Detected, but ignored flowcell: ${detected_flowcell}
+
+                            Read 2: ${fastq_2}
+                            Detected flowcell: ${detected_flowcell_r2}
+                            """.stripIndent())
+                        error("Please check your samplesheet for mismatched FASTQ file pairs.")
+                    }
                 }
             }
             // handle single and paired-end fastq files
