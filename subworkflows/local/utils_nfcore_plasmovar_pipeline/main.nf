@@ -246,11 +246,13 @@ workflow PIPELINE_INITIALISATION {
             def ( meta, fastqs ) = ch_item
 
             // build unique identifier based on sample name, library, lane and flowcell
-            def id_elements = [meta.sample]
-            if (meta.library) id_elements.add("LIB_${meta.library}")
-            if (meta.lane) id_elements.add("LANE_${meta.lane}")
-            if (meta.flowcell) id_elements.add("FC_${meta.flowcell}")
-
+            def id_elements = [sanitizeMetadataValue(meta.sample)]
+            if (meta.library)
+                id_elements.add("LIB_${sanitizeMetadataValue(meta.library)}")
+            if (meta.lane)
+                id_elements.add("LANE_${sanitizeMetadataValue(meta.lane)}")
+            if (meta.flowcell)
+                id_elements.add("FC_${sanitizeMetadataValue(meta.flowcell)}")
             meta = meta + [
                 id: id_elements.join('-'),
                 num_entries: num_entries.toInteger(),
@@ -495,6 +497,10 @@ def extractFlowcellFromFastq(path) {
     }
 
     return fcid
+}
+
+def sanitizeMetadataValue(value) {
+    return value?.toString()?.replaceAll(/[^A-Za-z0-9._-]/, '_')
 }
 
 // TODO: optionally just return warnings instead of stopping the pipeline. Non-unique entries should still be caught further downstream and this would allow non-standard files to be processed if there is just a single run per sample (or even just no repeated lanes/lib combinations).
