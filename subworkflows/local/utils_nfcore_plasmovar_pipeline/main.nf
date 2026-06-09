@@ -95,20 +95,74 @@ workflow PIPELINE_INITIALISATION {
         .map { meta, fastq_1, fastq_2 ->
             // auto-detect lane if not provided - used for checking uniqueness and read group construction
             if (params.auto_detect_lanes && !meta.lane && meta.id) {
+                // TODO: add fallback option for extracting lane info from fastq identifiers
                 def detected_lane = extractLaneFromFilename(fastq_1.toString())
                 if (detected_lane) {
-                    meta = meta + [lane: detected_lane]
                     log.warn("Auto-detected lane ${detected_lane} for sample ${meta.id} with fastq file(s) ${fastq_1} ${fastq_2}")
                 }
                 else {
-                    log.warn("Could not extract lane information from FASTQ filename: ${fastq_1}. Proceeding without lane info, but this could lead to duplicate input warnings later on.")
+                    log.warn("Proceeding without lane info for ${meta.id}, but this could lead to duplicate input warnings or incorrect results.")
                 }
+                // check if detected lane match for paired reads
+                if (fastq_2) {
+                    def detected_lane_r2 = extractLaneFromFilename(fastq_2.toString())
+                    if (detected_lane != detected_lane_r2) {
+                        log.error("""
+                            Lane mismatch for paired reads of sample '${meta.id}'
+                            Paired-end reads must originate from the same sequencing run.
+
+                            Read 1: ${fastq_1}
+                            Flowcell: ${detected_lane}
+
+                            Read 2: ${fastq_2}
+                            Flowcell: ${detected_lane_r2}
+                            """.stripIndent())
+                        error("Please check your samplesheet for mismatched FASTQ file pairs.")
+                    }
+                }
+                meta = meta + [lane: detected_lane]
+            }
+            // If lane is manually provided, validate it matches FASTQ filename (optional strict mode)
+            else if (params.strict_lane_detection && params.auto_detect_lanes && meta.lane) {
+                def detected_lane = extractLaneFromFilename(fastq_1.toString())
+                if (detected_lane && meta.lane != detected_lane) {
+                    log.warn("""
+                        Samplesheet provided lane '${meta.lane}'
+                        does not match detected lane '${detected_lane}'
+                        extracted from file name '${fastq_1}'.
+                        Using provided value in samplesheet: '${meta.lane}'.
+                    """.stripIndent())
+                }
+                if (fastq_2) {
+                    def detected_lane_r2 = extractLaneFromFilename(fastq_2.toString())
+                    if (detected_lane &&
+                        detected_lane_r2 &&
+                        detected_lane != detected_lane_r2) {
+                        log.error("""
+                            Lane mismatch for paired reads of sample '${meta.id}'
+                            Paired-end reads must originate from the same sequencing run.
+
+                            Provided lane: ${meta.lane}
+
+                            Read 1: ${fastq_1}
+                            Detected, but ignored lane: ${detected_lane}
+
+                            Read 2: ${fastq_2}
+                            Detected lane: ${detected_lane_r2}
+                            """.stripIndent())
+                        error("Please check your samplesheet for mismatched FASTQ file pairs.")
+                    }
+                }
+
             }
             // auto-detect flowcell if not provided - used for checking uniqueness and read group construction
-            if (params.auto_detect_flowcells && !meta.flowcell && meta.id) {
+            if (params.auto_detect_flowcells && !meta.flowcell) {
                 def detected_flowcell = extractFlowcellFromFastq(fastq_1)
-                if (!detected_flowcell) {
-                    log.warn("Could not extract flowcell ID from FASTQ header in file: ${fastq_1}. Proceeding without flowcell info, but this could lead to duplicate input warnings later on.")
+                if (detected_flowcell) {
+                    log.warn("Auto-detected flowcell ${detected_flowcell} for sample ${meta.id} with fastq file(s) ${fastq_1} ${fastq_2}")
+                }
+                else {
+                    log.warn("Proceeding without flowcell info for ${meta.id}, but this could lead to duplicate input warnings or incorrect results.")
                 }
                 // check if flowcells match for paired reads
                 if (fastq_2) {
@@ -130,14 +184,14 @@ workflow PIPELINE_INITIALISATION {
                 meta = meta + [flowcell: detected_flowcell]
             }
             // If flowcell is manually provided, validate it matches FASTQ headers (optional strict mode)
-            else if (params.auto_detect_flowcells && meta.flowcell) {
+            else if (params.strict_flowcell_detection && params.auto_detect_flowcells && meta.flowcell) {
                 def detected_flowcell = extractFlowcellFromFastq(fastq_1)
                 if (detected_flowcell && meta.flowcell != detected_flowcell) {
                     log.warn("""
-                        Manually provided flowcell '${meta.flowcell}'
-                        does not match flowcell '${detected_flowcell}'
+                        Samplesheet provided flowcell '${meta.flowcell}'
+                        does not match detected flowcell '${detected_flowcell}'
                         extracted from FASTQ header in '${fastq_1}'.
-                        Using manually provided value from samplesheet: '${meta.flowcell}'.
+                        Using provided value in samplesheet: '${meta.flowcell}'.
                     """.stripIndent())
                 }
                 if (fastq_2) {
@@ -333,6 +387,13 @@ def extractLaneFromFilename(filename) {
         if (matcher) {
             def lane = matcher[0][1]    // matcher format = [sample_L001_R1.fastq.gz, 001]
             return lane.padLeft(3, '0') // pad lane to 3 digits for consistency
+        } else {
+            def msg = "Failed to extract lane info from FASTQ file name: ${filename}"
+            if (params.strict_lane_detection) {
+                error(msg)
+            } else {
+                log.warn(msg)
+            }
         }
         return null // return nothing if no pattern is found
     }
