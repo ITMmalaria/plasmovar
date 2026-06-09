@@ -344,11 +344,26 @@ def extractLaneFromFilename(filename) {
 // to input validation for improved uniqueness validation.
 // Now it is possible to use identical sample names and lanes for runs on different flowcells
 def extractFlowcellFromFastq(path) {
-    // expected format:
+    // expected formats (https://en.wikipedia.org/wiki/FASTQ_format#Illumina_sequence_identifiers)
+    //
+    // CASAVA 1.8 - seven fields
+    // @A00379:443:HJMTYDSX2:4:1101:4029:1078 1:N:0:TCGTGGAT+ACCTAGAC
+    // @<instrument>:<run-id>:<flowcell-id>:<lane>:<tile>:<x-coord>:<y-coord> <read-pair>:<filtered>:<control-bits>:<index-sequence>
+    //
+    // Older Illumina format - five fields
+    // @HWUSI-EAS100R:6:73:941:1973#0/1
+    // @<machine_id>:<lane>:<tile>:<x_coord>:<y_coord>#<index>/<read>
+    //
+    // In SRA/ENI fastq files, the identifier often starts with an accession, followed by a space, followed by the actual fastq identifier
+    // For the five fields format, this can lead to a flowcell id containing a space
+
     // xx:yy:FLOWCELLID:LANE:... (seven fields)
     // or
     // FLOWCELLID:LANE:xx:... (five fields)
-    def line
+
+    String fcid = null
+    String line
+
     try {
         path.withInputStream {
             InputStream gzipStream = new java.util.zip.GZIPInputStream(it)
@@ -357,27 +372,67 @@ def extractFlowcellFromFastq(path) {
             line = buffered.readLine()
         }
     } catch (Exception e) {
-        log.error("Could not extract flowcell ID from ${path}: ${e.message}")
-        error("Please verify the file is a valid gzipped FASTQ.")
+        log.error("ERROR: Could not extract flowcell ID from ${path}: ${e.message}")
+        error("Please verify that the file is a valid gzipped FASTQ file.")
 
     }
 
-    if (!line || !line.startsWith('@')) {
+    if (!line || !line.startsWith('@')) {   // ~ !line?.startsWith('@')
         log.error("ERROR: Invalid FASTQ header in ${path}: ${line}")
-        error(" Please verify this is a valid FASTQ file.")
+        error("Please verify that this is a valid FASTQ file with headers that start with '@'.")
     }
 
-    line = line.substring(1)
-    def fields = line.split(':')
-    String fcid = null
+    // remove leading @ and strip whitespace
+    line = line.substring(1).trim()
+
+    // split on whitespace to account for SRA identifiers
+    def tokens = line.split(/\s+/)
+    def header = tokens.find { it.count(':') >= 4 }
+
+    if (!header) {
+        def msg = """
+            Could not find Illumina-style header in FASTQ ${path}:
+            ${line}
+        """.stripIndent()
+
+        if (params.strict_flowcell_detection) {
+            error(msg)
+        } else {
+            log.warn(msg)
+            return null
+        }
+    }
+
+    def fields = header.split(':')
 
     if (fields.size() >= 7) {
         // CASAVA 1.8+ format
         fcid = fields[2]
     } else if (fields.size() == 5) {
+        // Old Illumina format
         fcid = fields[0]
     }
-    // returns null otherwise
+
+    if (!fcid) {
+        def msg = """
+            Could not determine flowcell ID from FASTQ header ${path}:
+            ${line}
+
+            Expected one of:
+              - CASAVA 1.8+ format
+              - Legacy Illumina format
+              - SRA-reformatted Illumina format
+
+            Flowcell auto-detection will be skipped.
+        """.stripIndent()
+        if (params.strict_flowcell_detection) {
+            error(msg)
+        } else {
+            log.warn(msg)
+            return null
+        }
+    }
+
     return fcid
 }
 
