@@ -118,7 +118,7 @@ Configure intervals of genomic regions for scatter/gather parallelization of GAT
 | Parameter | Description | Type | Default | Required | Hidden |
 |-----------|-----------|-----------|-----------|-----------|-----------|
 | `scatter_count` | Maximum number of files into which to scatter the intervals for parallel processing. | `integer` | 20 |  |  |
-| `save_interval_scatter` | Save scattered interval lists for debugging purposes. | `boolean` | False |  | True |
+| `save_interval_scatter` | Save scattered interval lists for debugging purposes. | `boolean` | False |  |  |
 
 ## GATK base quality score recalibration (BQSR) options
 

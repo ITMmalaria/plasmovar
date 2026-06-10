@@ -452,8 +452,7 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Save scattered interval lists for debugging purposes.",
-                    "fa_icon": "fas fa-download",
-                    "hidden": true
+                    "fa_icon": "fas fa-download"
                 }
             }
         },
