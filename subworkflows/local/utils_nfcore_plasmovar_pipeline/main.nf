@@ -87,146 +87,27 @@ workflow PIPELINE_INITIALISATION {
     // Create channel from input file provided through params.input
     //
     // Adapted from: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/subworkflows/local/samplesheet_to_channel/main.nf
+    // Note that `id` column in samplesheet is expected to refer to a biological sample and all inputs will be grouped by it
+    // A new meta.sample value will be constructed based on it, and id will refer to unique fastq (pairs) based on lane/library/flowcell information
     channel
         .fromList(samplesheetToList(params.input, "${projectDir}/assets/schema_input.json"))
-        // [[id:sample, lane:1, library:null], /path/to/sample_L001_R1.fastq.gz, /path/to/sample_L001_R2.fastq.gz]
-        // [[sample:sample_1, lane:1], /path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]
-        // extract sample id (can be shared by multiple fastq (pairs)), so we can group by it
+        // [[id:sample, lane:1, flowcell: null, library:null], /path/to/sample_L001_R1.fastq.gz, /path/to/sample_L001_R2.fastq.gz]
+
+        // extract sample id, so we can use it as a grouping key and detect and validate lane/flowcell info
+        // sample id can be shared by multiple fastq (pairs)
         .map { meta, fastq_1, fastq_2 ->
-            // auto-detect lane if not provided - used for checking uniqueness and read group construction
-            if (params.auto_detect_lanes && !meta.lane) {
-                // TODO: add fallback option for extracting lane info from fastq identifiers
 
-                def detected_lane = extractLaneFromFilename(fastq_1.toString())
+            // Detect and validate lane and flowcell info - used for checking input file uniqueness and constructing read groups
+            // Samplesheet-provided info always receives priority, but check happens regardless
+            // Use params.*_detection `strict` or `lenient` to either halt or warn upon mismatches or for empty values
+            def lane = detectOrValidateField(meta, 'lane', fastq_1, fastq_2,
+                { f -> extractLaneFromFilename(f.toString()) }, params.lane_detection)
 
-                if (detected_lane) {
-                    log.warn("Auto-detected lane ${detected_lane} for sample ${meta.id} with fastq file(s) ${fastq_1} ${fastq_2}")
-                }
-                else {
-                    log.warn("Failed to extract lane info from FASTQ file name: ${fastq_1}")
-                    if (! params.strict_lane_detection) {
-                        log.warn("Proceeding without lane info for ${meta.id}, but this could lead to duplicate input warnings or incorrect results.")
-                    } else {
-                        log.error("Stopping pipeline since strict_lane_detection was enabled.")
-                    }
-                }
+            def flowcell = detectOrValidateField(meta, 'flowcell', fastq_1, fastq_2,
+                { f -> extractFlowcellFromFastq(f) }, params.flowcell_detection)
 
-                // check if detected lanes match for paired reads
-                if (fastq_2) {
-                    def detected_lane_r2 = extractLaneFromFilename(fastq_2.toString())
-                    if (detected_lane != detected_lane_r2) {
-                        log.error("""
-                            Lane mismatch for paired reads of sample '${meta.id}'
-                            Paired-end reads must originate from the same sequencing run.
+            meta = meta + [lane: lane, flowcell: flowcell]
 
-                            Read 1: ${fastq_1}
-                            Lane: ${detected_lane}
-
-                            Read 2: ${fastq_2}
-                            Lane: ${detected_lane_r2}
-                            """.stripIndent())
-                        error("Please check your samplesheet for mismatched FASTQ file pairs.")
-                    }
-                }
-
-                meta = meta + [lane: detected_lane]
-            }
-
-            // if lane is manually provided, validate that it matches FASTQ filename (optional strict mode)
-            else if ( (params.strict_lane_detection || params.auto_detect_lanes) && meta.lane) {
-                def detected_lane = extractLaneFromFilename(fastq_1.toString())
-                if (detected_lane && meta.lane != detected_lane) {
-                    log.warn("""
-                        Samplesheet provided lane '${meta.lane}'
-                        does not match detected lane '${detected_lane}'
-                        extracted from file name '${fastq_1}'.
-                        Using provided value in samplesheet: '${meta.lane}'.
-                    """.stripIndent())
-                }
-
-                // check if detectes lanes match for paired reads
-                if (fastq_2) {
-                    def detected_lane_r2 = extractLaneFromFilename(fastq_2.toString())
-                    if (detected_lane &&
-                        detected_lane_r2 &&
-                        detected_lane != detected_lane_r2) {
-                        log.error("""
-                            Lane mismatch for paired reads of sample '${meta.id}'
-                            Paired-end reads must originate from the same sequencing run.
-
-                            Provided lane: ${meta.lane}
-
-                            Read 1: ${fastq_1}
-                            Detected, but ignored lane: ${detected_lane}
-
-                            Read 2: ${fastq_2}
-                            Detected lane: ${detected_lane_r2}
-                            """.stripIndent())
-                        error("Please check your samplesheet for mismatched FASTQ file pairs.")
-                    }
-                }
-
-            }
-            // auto-detect flowcell if not provided - used for checking uniqueness and read group construction
-            if (params.auto_detect_flowcells && !meta.flowcell) {
-                def detected_flowcell = extractFlowcellFromFastq(fastq_1)
-                if (detected_flowcell) {
-                    log.warn("Auto-detected flowcell ${detected_flowcell} for sample ${meta.id} with fastq file(s) ${fastq_1} ${fastq_2}")
-                }
-                else {
-                    log.warn("Proceeding without flowcell info for ${meta.id}, but this could lead to duplicate input warnings or incorrect results.")
-                }
-                // check if flowcells match for paired reads
-                if (fastq_2) {
-                    def detected_flowcell_r2 = extractFlowcellFromFastq(fastq_2)
-                    if (detected_flowcell != detected_flowcell_r2) {
-                        log.error("""
-                            Flowcell ID mismatch for paired reads of sample '${meta.id}'
-                            Paired-end reads must originate from the same sequencing run.
-
-                            Read 1: ${fastq_1}
-                            Flowcell: ${detected_flowcell}
-
-                            Read 2: ${fastq_2}
-                            Flowcell: ${detected_flowcell_r2}
-                            """.stripIndent())
-                        error("Please check your samplesheet for mismatched FASTQ file pairs.")
-                    }
-                }
-                meta = meta + [flowcell: detected_flowcell]
-            }
-            // If flowcell is manually provided, validate it matches FASTQ headers (optional strict mode)
-            else if (params.strict_flowcell_detection && params.auto_detect_flowcells && meta.flowcell) {
-                def detected_flowcell = extractFlowcellFromFastq(fastq_1)
-                if (detected_flowcell && meta.flowcell != detected_flowcell) {
-                    log.warn("""
-                        Samplesheet provided flowcell '${meta.flowcell}'
-                        does not match detected flowcell '${detected_flowcell}'
-                        extracted from FASTQ header in '${fastq_1}'.
-                        Using provided value in samplesheet: '${meta.flowcell}'.
-                    """.stripIndent())
-                }
-                if (fastq_2) {
-                    def detected_flowcell_r2 = extractFlowcellFromFastq(fastq_2)
-                    if (detected_flowcell &&
-                        detected_flowcell_r2 &&
-                        detected_flowcell != detected_flowcell_r2) {
-                        log.error("""
-                            Flowcell ID mismatch for paired reads of sample '${meta.id}'
-                            Paired-end reads must originate from the same sequencing run.
-
-                            Provided flowcell: ${meta.flowcell}
-
-                            Read 1: ${fastq_1}
-                            Detected, but ignored flowcell: ${detected_flowcell}
-
-                            Read 2: ${fastq_2}
-                            Detected flowcell: ${detected_flowcell_r2}
-                            """.stripIndent())
-                        error("Please check your samplesheet for mismatched FASTQ file pairs.")
-                    }
-                }
-            }
             // handle single and paired-end fastq files
             if (!fastq_2) {
                 return [ meta.id, [ meta + [ single_end:true, sample: "${meta.id}" ], [ fastq_1 ] ] ]
@@ -235,8 +116,8 @@ workflow PIPELINE_INITIALISATION {
             }
             // TODO compare with nf-core template approach, which uses fewer nested lists + flatten.
         }
-        .tap{ ch_samples } // save sample-wise channel for later re-use
         // [sample_1, [[id:sample_1, lane:1, library:null, flowcell:232KF7LT4, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]]
+        .tap{ ch_samples } // save sample-wise channel for later re-use
         // group by sample id
         .groupTuple()
         // [sample_1, [[[id:sample_1, lane:1, library:null, flowcell:232KF7LT4, single_end:false, sample:sample_1], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]], [[id:sample_1, lane:2, library:null, flowcell:232WTNLT4, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]]
@@ -256,7 +137,6 @@ workflow PIPELINE_INITIALISATION {
         // [sample_1, 2, true, false, true, [[id:sample_1, lane:2, library:null, flowcell:232WTNLT4, single_end:false, sample:sample_1], [/path/to/sample_1_L002_R1_001.fastq.gz, /path/to/sample_1_L002_R2_001.fastq.gz]]]
         .map { _sample, num_entries, multi_lane, multi_lib, multi_fc, ch_item ->
             def ( meta, fastqs ) = ch_item
-
             // build unique identifier based on sample name, library, lane and flowcell
             def id_elements = [sanitizeMetadataValue(meta.sample)]
             if (meta.library)
@@ -272,7 +152,6 @@ workflow PIPELINE_INITIALISATION {
                 multiple_libraries: multi_lib,
                 multiple_flowcells: multi_fc
             ]
-
             return [ meta, fastqs ]
         }
         // [[id:sample_1-LANE_1-FC_232KF7LT4, lane:1, library:null, flowcell:232KF7LT4, single_end:false, sample:sample_1, num_entries:2, multiple_lanes:true, multiple_libraries:false], [/path/to/sample_1_L001_R1_001.fastq.gz, /path/to/sample_1_L001_R2_001.fastq.gz]]
@@ -386,6 +265,66 @@ def validateInputSamplesheet(input) {
 }
 
 //
+// Detects and validates lane and flowcell fields
+// Performs a comparison between paired reads, as well as detected and samplesheet-provided values
+// Samplesheet-provided info always receives priority
+// Relies on provided mode to either halt or warn upon mismatches or for empty values
+//
+def detectOrValidateField(meta, field, fastq_1, fastq_2, extractor, mode) {
+    // always attempt to detect lane/flowcell
+    def detected_r1 = extractor.call(fastq_1)
+    // Alternative option in case .call() does not work nicely in strict syntax
+    // def detected_r1 = (field == 'lane')
+    //     ? extractLaneFromFilename(fastq_1.toString())
+    //     : extractFlowcellFromFastq(fastq_1)
+
+    // check paired-end consistency (always returns an error when mismatch is detected)
+    if (fastq_2) {
+        def detected_r2 = extractor.call(fastq_2)
+        // only perform check if values could be detected
+        if (detected_r1 && detected_r2 && detected_r1 != detected_r2) {
+            error("""
+                ${field.capitalize()} mismatch for paired reads of sample '${meta.id}'.
+                Read 1: ${fastq_1} -> ${detected_r1}
+                Read 2: ${fastq_2} -> ${detected_r2}
+                Please check your samplesheet for mismatched FASTQ file pairs.
+            """.stripIndent().trim())
+        }
+    }
+
+    // if lane/flowcell was provided in samplesheet, compare it to detected value
+    // Halt or warn depending on mode
+    def provided = meta[field]
+
+    if (provided) {
+        if (detected_r1 && provided != detected_r1) {
+            def msg = "${field.capitalize()} mismatch for '${meta.id}': " +
+                      "samplesheet='${provided}', detected='${detected_r1}' from '${fastq_1}'."
+            if (mode == 'strict') {
+                error(msg)
+            }
+            log.warn("${msg} Using samplesheet-provided value in favour of detected value.")
+        }
+        // samplesheet-provided value gets priority
+        return provided
+    }
+
+    // if no value was provided in the samplesheet, use the detected one (if found)
+    if (detected_r1) {
+        log.info("Auto-detected ${field} '${detected_r1}' for sample '${meta.id}'.")
+        return detected_r1
+    }
+
+    // if no value was provided and detection failed, halt or warn depending on mode
+    def msg = "Could not detect ${field} for sample '${meta.id}' from '${fastq_1}'."
+    if (mode == 'strict') {
+        error(msg)
+    }
+    log.warn("${msg} Proceeding without ${field} info. This could lead to duplicate input warnings or incorrect results.")
+    return null
+}
+
+//
 // Attempt to extract lane info from fastq filename, as a fallback when this info is not provided
 //
 def extractLaneFromFilename(filename) {
@@ -396,18 +335,11 @@ def extractLaneFromFilename(filename) {
         ~/.*[_\.]lane[_\-]?(\d{1,3})[_\.].*/    // _lane1_ or _lane-01_
     ]
 
-    return patterns.findResult { pattern ->
+    patterns.findResult { pattern ->
         def matcher = filename =~ pattern
         if (matcher) {
             def lane = matcher[0][1]    // matcher format = [sample_L001_R1.fastq.gz, 001]
             return lane.padLeft(3, '0') // pad lane to 3 digits for consistency
-        } else {
-            def msg = "Failed to extract lane info from FASTQ file name: ${filename}"
-            if (params.strict_lane_detection) {
-                error(msg)
-            } else {
-                log.warn(msg)
-            }
         }
         return null // return nothing if no pattern is found
     }
@@ -436,9 +368,8 @@ def extractFlowcellFromFastq(path) {
     // or
     // FLOWCELLID:LANE:xx:... (five fields)
 
-    String fcid = null
+    // Try to read the first line of the FASTQ file
     String line
-
     try {
         path.withInputStream {
             InputStream gzipStream = new java.util.zip.GZIPInputStream(it)
@@ -449,9 +380,9 @@ def extractFlowcellFromFastq(path) {
     } catch (Exception e) {
         log.error("ERROR: Could not extract flowcell ID from ${path}: ${e.message}")
         error("Please verify that the file is a valid gzipped FASTQ file.")
-
     }
 
+    // Check if the header starts with an @ (i.e. it is a valid FASTQ file)
     if (!line || !line.startsWith('@')) {   // ~ !line?.startsWith('@')
         log.error("ERROR: Invalid FASTQ header in ${path}: ${line}")
         error("Please verify that this is a valid FASTQ file with headers that start with '@'.")
@@ -461,54 +392,25 @@ def extractFlowcellFromFastq(path) {
     line = line.substring(1).trim()
 
     // split on whitespace to account for SRA identifiers
-    def tokens = line.split(/\s+/)
-    def header = tokens.find { it.count(':') >= 4 }
+    def header = line
+        .split(/\s+/)
+        .find { it.count(':') >= 4 }
 
     if (!header) {
-        def msg = """
-            Could not find Illumina-style header in FASTQ ${path}:
-            ${line}
-        """.stripIndent()
-
-        if (params.strict_flowcell_detection) {
-            error(msg)
-        } else {
-            log.warn(msg)
-            return null
-        }
+        return null
     }
 
     def fields = header.split(':')
 
     if (fields.size() >= 7) {
         // CASAVA 1.8+ format
-        fcid = fields[2]
+        return fields[2]
     } else if (fields.size() == 5) {
         // Old Illumina format
-        fcid = fields[0]
+        return fields[0]
     }
 
-    if (!fcid) {
-        def msg = """
-            Could not determine flowcell ID from FASTQ header ${path}:
-            ${line}
-
-            Expected one of:
-              - CASAVA 1.8+ format
-              - Legacy Illumina format
-              - SRA-reformatted Illumina format
-
-            Flowcell auto-detection will be skipped.
-        """.stripIndent()
-        if (params.strict_flowcell_detection) {
-            error(msg)
-        } else {
-            log.warn(msg)
-            return null
-        }
-    }
-
-    return fcid
+    return null
 }
 
 def sanitizeMetadataValue(value) {
