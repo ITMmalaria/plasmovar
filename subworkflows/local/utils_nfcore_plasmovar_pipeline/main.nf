@@ -331,15 +331,17 @@ def extractLaneFromFilename(filename) {
     // [_\.] - ensures lane is preceded/followed by underscore or dot (not just anywhere)
     // (\d{1,3}) - capture group for the lane number between 1 and 3 digits long
     def patterns = [
-        ~/.*[_\.]L(\d{1,3})[_\.].*/,            // _L001_, _L1_, .L01.
-        ~/.*[_\.]lane[_\-]?(\d{1,3})[_\.].*/    // _lane1_ or _lane-01_
+        ~/.*[_\.](L)(\d{1,3})[_\.].*/,            // _L001_, _L1_, .L01.
+        ~/.*[_\.](lane[_\-]?)(\d{1,3})[_\.].*/    // _lane1_ or _lane-01_
     ]
 
     patterns.findResult { pattern ->
         def matcher = filename =~ pattern
+        // matcher format = [sample_L001_R1.fastq.gz, L, 001]
         if (matcher) {
-            def lane = matcher[0][1]    // matcher format = [sample_L001_R1.fastq.gz, 001]
-            return lane.padLeft(3, '0') // pad lane to 3 digits for consistency
+            def lane_prefix = matcher[0][1] // e.g, "L" / "lane" / "lane-" / "lane_"
+            def lane_number = matcher[0][2] // e.g, "008", pad lane to 3 digits for consistency
+            return "${lane_prefix}${lane_number}"
         }
         return null // return nothing if no pattern is found
     }
