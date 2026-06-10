@@ -36,19 +36,19 @@
                     "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
                     "fa_icon": "fas fa-file-signature"
                 },
-                "lane_detection": {
-                    "type": "string",
-                    "default": "strict",
-                    "enum": ["strict", "lenient"],
+                "strict_lane_detection": {
+                    "hidden": true,
+                    "type": "boolean",
+                    "default": true,
                     "description": "Handles behaviour when detecting and validating lane info for input fastq files.",
-                    "help_text": "In strict mode, the pipeline will halt if 1) the lane provided in the samplesheet does not match the lane detected in the fastq file name, 2) the detected lanes do match between read pairs, and 3) if no lane was provided in the samplesheet and detection fails. In lenient mode, only warnings are issued, except for read pair mismatches, which always cause an error. Automatic detection searches for file name patterns such as `_L001_`, `_L1_`, `.L01`, `_lane1_` or `_lane-01_`."
+                    "help_text": "In strict mode, the pipeline will halt if 1) the lane provided in the samplesheet does not match the lane detected in the fastq file name, 2) the detected lanes do match between read pairs, and 3) if no lane was provided in the samplesheet and detection fails. Otherwise, only warnings are issued, except for read pair mismatches, which always cause an error. Automatic detection searches for file name patterns such as `_L001_`, `_L1_`, `.L01`, `_lane1_` or `_lane-01_`."
                 },
-                "flowcell_detection": {
-                    "type": "string",
-                    "default": "strict",
-                    "enum": ["strict", "lenient"],
+                "strict_flowcell_detection": {
+                    "hidden": true,
+                    "type": "boolean",
+                    "default": true,
                     "description": "Whether to (attempt to) automatically extract flowcell IDs from from the input fastq files when this info is missing from the samplesheet.",
-                    "help_text": "In strict mode, the pipeline will halt if 1) the flowcell provided in the samplesheet does not match the flowcell detected in the fastq header, 2) the detected flowcells do match between read pairs, and 3) if no flowcell was provided in the samplesheet and detection fails. In lenient mode, only warnings are issued, except for read pair mismatches, which always cause an error. Attempts to parse the first FASTQ header and extract the flowcell ID. Expects CASAVA 1.8+ or the old Illumina format, and can also handle SRA/ENI accession prefix (space-separated)."
+                    "help_text": "In strict mode, the pipeline will halt if 1) the flowcell provided in the samplesheet does not match the flowcell detected in the fastq header, 2) the detected flowcells do match between read pairs, and 3) if no flowcell was provided in the samplesheet and detection fails. Otherwise, only warnings are issued, except for read pair mismatches, which always cause an error. Attempts to parse the first FASTQ header and extract the flowcell ID. Expects CASAVA 1.8+ or the old Illumina format, and can also handle SRA/ENI accession prefix (space-separated)."
                 }
             }
         },

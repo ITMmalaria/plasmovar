@@ -99,12 +99,10 @@ workflow PIPELINE_INITIALISATION {
 
             // Detect and validate lane and flowcell info - used for checking input file uniqueness and constructing read groups
             // Samplesheet-provided info always receives priority, but check happens regardless
-            // Use params.*_detection `strict` or `lenient` to either halt or warn upon mismatches or for empty values
-            def lane = detectOrValidateField(meta, 'lane', fastq_1, fastq_2,
-                { f -> extractLaneFromFilename(f.toString()) }, params.lane_detection)
+            // Use params.strict_*_detection to halt instead of warn upon mismatches or for empty values
+            def lane = detectOrValidateField(meta, 'lane', fastq_1, fastq_2, params.strict_lane_detection)
 
-            def flowcell = detectOrValidateField(meta, 'flowcell', fastq_1, fastq_2,
-                { f -> extractFlowcellFromFastq(f) }, params.flowcell_detection)
+            def flowcell = detectOrValidateField(meta, 'flowcell', fastq_1, fastq_2, params.strict_flowcell_detection)
 
             meta = meta + [lane: lane, flowcell: flowcell]
 
@@ -270,17 +268,23 @@ def validateInputSamplesheet(input) {
 // Samplesheet-provided info always receives priority
 // Relies on provided mode to either halt or warn upon mismatches or for empty values
 //
-def detectOrValidateField(meta, field, fastq_1, fastq_2, extractor, mode) {
+def detectOrValidateField(meta, field, fastq_1, fastq_2, strict) {
     // always attempt to detect lane/flowcell
-    def detected_r1 = extractor.call(fastq_1)
-    // Alternative option in case .call() does not work nicely in strict syntax
-    // def detected_r1 = (field == 'lane')
-    //     ? extractLaneFromFilename(fastq_1.toString())
-    //     : extractFlowcellFromFastq(fastq_1)
+    def detected_r1
+    if (field == 'lane') {
+        detected_r1 = extractLaneFromFilename(fastq_1.toString()) ?: extractLaneFromFastqHeader(fastq_1)
+    } else if (field == 'flowcell') {
+        detected_r1 = extractFlowcellFromFastq(fastq_1)
+    }
 
     // check paired-end consistency (always returns an error when mismatch is detected)
     if (fastq_2) {
-        def detected_r2 = extractor.call(fastq_2)
+        def detected_r2
+        if (field == 'lane') {
+            detected_r2 = extractLaneFromFilename(fastq_2.toString()) ?: extractLaneFromFastqHeader(fastq_2)
+        } else if (field == 'flowcell') {
+            detected_r2 = extractFlowcellFromFastq(fastq_2)
+        }
         // only perform check if values could be detected
         if (detected_r1 && detected_r2 && detected_r1 != detected_r2) {
             error("""
@@ -300,7 +304,7 @@ def detectOrValidateField(meta, field, fastq_1, fastq_2, extractor, mode) {
         if (detected_r1 && provided != detected_r1) {
             def msg = "${field.capitalize()} mismatch for '${meta.id}': " +
                       "samplesheet='${provided}', detected='${detected_r1}' from '${fastq_1}'."
-            if (mode == 'strict') {
+            if (strict) {
                 error(msg)
             }
             log.warn("${msg} Using samplesheet-provided value in favour of detected value.")
@@ -317,7 +321,7 @@ def detectOrValidateField(meta, field, fastq_1, fastq_2, extractor, mode) {
 
     // if no value was provided and detection failed, halt or warn depending on mode
     def msg = "Could not detect ${field} for sample '${meta.id}' from '${fastq_1}'."
-    if (mode == 'strict') {
+    if (strict) {
         error(msg)
     }
     log.warn("${msg} Proceeding without ${field} info. This could lead to duplicate input warnings or incorrect results.")
@@ -345,6 +349,53 @@ def extractLaneFromFilename(filename) {
         }
         return null // return nothing if no pattern is found
     }
+}
+
+//
+// Attempt to extract lane info from fastq header
+// Used as fallback when file name detection fails
+//
+def extractLaneFromFastqHeader(path) {
+    // Try to read the first line of the FASTQ file
+    String line
+    try {
+        path.withInputStream {
+            InputStream gzipStream = new java.util.zip.GZIPInputStream(it)
+            Reader decoder = new InputStreamReader(gzipStream, 'ASCII')
+            BufferedReader buffered = new BufferedReader(decoder)
+            line = buffered.readLine()
+        }
+    } catch (Exception e) {
+        log.error("ERROR: Could not extract lane ID from ${path}: ${e.message}")
+        error("Please verify that the file is a valid gzipped FASTQ file.")
+    }
+
+    // Check if the header starts with an @ (i.e. it is a valid FASTQ file)
+    if (!line || !line.startsWith('@')) {   // ~ !line?.startsWith('@')
+        log.error("ERROR: Invalid FASTQ header in ${path}: ${line}")
+        error("Please verify that this is a valid FASTQ file with headers that start with '@'.")
+    }
+
+    // remove leading @ and strip whitespace
+    line = line.substring(1).trim()
+
+    // split on whitespace to account for SRA identifiers
+    def header = line
+        .split(/\s+/)
+        .find { it.count(':') >= 4 }
+
+    if (!header) return null
+
+    def fields = header.split(':')
+
+    if (fields.size() >= 7) {
+        // CASAVA 1.8+ format
+        return "L${fields[3]}"
+    } else if (fields.size() == 5) {
+        // Old Illumina format
+        return "L${fields[1]}"
+    }
+    return null
 }
 
 // Parse first line of a FASTQ file, return the flowcell ID
@@ -398,9 +449,7 @@ def extractFlowcellFromFastq(path) {
         .split(/\s+/)
         .find { it.count(':') >= 4 }
 
-    if (!header) {
-        return null
-    }
+    if (!header) return null
 
     def fields = header.split(':')
 
