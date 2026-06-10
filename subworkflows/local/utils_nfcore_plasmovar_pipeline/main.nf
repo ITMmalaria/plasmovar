@@ -94,16 +94,24 @@ workflow PIPELINE_INITIALISATION {
         // extract sample id (can be shared by multiple fastq (pairs)), so we can group by it
         .map { meta, fastq_1, fastq_2 ->
             // auto-detect lane if not provided - used for checking uniqueness and read group construction
-            if (params.auto_detect_lanes && !meta.lane && meta.id) {
+            if (params.auto_detect_lanes && !meta.lane) {
                 // TODO: add fallback option for extracting lane info from fastq identifiers
+
                 def detected_lane = extractLaneFromFilename(fastq_1.toString())
+
                 if (detected_lane) {
                     log.warn("Auto-detected lane ${detected_lane} for sample ${meta.id} with fastq file(s) ${fastq_1} ${fastq_2}")
                 }
                 else {
-                    log.warn("Proceeding without lane info for ${meta.id}, but this could lead to duplicate input warnings or incorrect results.")
+                    log.warn("Failed to extract lane info from FASTQ file name: ${fastq_1}")
+                    if (! params.strict_lane_detection) {
+                        log.warn("Proceeding without lane info for ${meta.id}, but this could lead to duplicate input warnings or incorrect results.")
+                    } else {
+                        log.error("Stopping pipeline since strict_lane_detection was enabled.")
+                    }
                 }
-                // check if detected lane match for paired reads
+
+                // check if detected lanes match for paired reads
                 if (fastq_2) {
                     def detected_lane_r2 = extractLaneFromFilename(fastq_2.toString())
                     if (detected_lane != detected_lane_r2) {
@@ -112,18 +120,20 @@ workflow PIPELINE_INITIALISATION {
                             Paired-end reads must originate from the same sequencing run.
 
                             Read 1: ${fastq_1}
-                            Flowcell: ${detected_lane}
+                            Lane: ${detected_lane}
 
                             Read 2: ${fastq_2}
-                            Flowcell: ${detected_lane_r2}
+                            Lane: ${detected_lane_r2}
                             """.stripIndent())
                         error("Please check your samplesheet for mismatched FASTQ file pairs.")
                     }
                 }
+
                 meta = meta + [lane: detected_lane]
             }
-            // If lane is manually provided, validate it matches FASTQ filename (optional strict mode)
-            else if (params.strict_lane_detection && params.auto_detect_lanes && meta.lane) {
+
+            // if lane is manually provided, validate that it matches FASTQ filename (optional strict mode)
+            else if ( (params.strict_lane_detection || params.auto_detect_lanes) && meta.lane) {
                 def detected_lane = extractLaneFromFilename(fastq_1.toString())
                 if (detected_lane && meta.lane != detected_lane) {
                     log.warn("""
@@ -133,6 +143,8 @@ workflow PIPELINE_INITIALISATION {
                         Using provided value in samplesheet: '${meta.lane}'.
                     """.stripIndent())
                 }
+
+                // check if detectes lanes match for paired reads
                 if (fastq_2) {
                     def detected_lane_r2 = extractLaneFromFilename(fastq_2.toString())
                     if (detected_lane &&
