@@ -4,13 +4,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). 
 Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re/docs/specifications/pipelines/requirements/semantic_versioning).
 
-## v0. - [date]
+## v0.2.0 - [2026-06-10]
 
-### `Fixed`
+### `Improved`
 
-- Fix bug in samplesheet parsing for single-end input where auto-detected flowcell information was not being assigned correctly to the meta map.
-
-## v0.2.0 - [2026-06-07]
+- Improve lane and flowcell detection and validation during samplesheet parsing.
+   - New boolean parameters `strict_lane_detection` and `strict_flowcell_detection` were introduced to replace the previous `auto_detect_*` parameters. Detection is now always performed, but in strict mode, the pipeline will halt rather than merely show warnings when there are mismatches between the samplesheet-provided and detected values, or if no values were provided and detection fails. Mismatches between the detected values of read file pairs always result in an error.
+   - Lane detection in fastq file name now returns the exact lane info, without number padding, and including any `L`-type prefix. This avoids false positive mismatch reporting between detected and provided values.
+   - Fallback lane detection in fastq header instead of file name was added. This returns the actual value detected in the header (usually a single digit), cast as a string, instead of `L###`, which hopefully results in fewer false positive mismatch warnings during the comparison with samplesheet-provided values.
 
 ### `Added`
 
@@ -19,6 +20,9 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 ### `Fixed`
 
 - The resource requirements for `seqkit sort` were changed in order to (hopefully) avoid OOM (out-of-memory) errors when processing large fastq files when using the SLURM job scheduler. The process now requests more initial RAM and does not request additional CPU on retries (always 4 threads as per [the seqkit docs recommendations](https://bioinf.shenwei.me/seqkit/usage/#parallelization-of-cpu-intensive-jobs)).
+- Fix bug in samplesheet parsing for single-end input where auto-detected flowcell information was not being assigned correctly to the meta map.
+- Flowcell detection should now be compatible with (most) SRA/ENI fastq files (fastq header prefixed with space separated accession before the Illumina header).
+
 
 ## v0.1.0 - [2026-06-06]
 
