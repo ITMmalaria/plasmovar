@@ -60,7 +60,7 @@ Now, you can run the pipeline using:
 <!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
 
 ```bash
-NXF_VER=25.10.4 nextflow run ITMmalaria/plasmovar \
+NXF_SYNTAX_PARSER=v1 nextflow run ITMmalaria/plasmovar \
    -profile <docker/singularity/.../institute> \
   --input samplesheet.cvs \
   --reference_fasta PlasmoDB-68_Pfalciparum3D7_Genome.fasta \
@@ -74,7 +74,7 @@ NXF_VER=25.10.4 nextflow run ITMmalaria/plasmovar \
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/running/run-pipelines#using-parameter-files).
 
 > [!WARNING]
-> Due to [various](https://nf-co.re/docs/developing/migration-guides/strict-syntax) [changes](https://docs.seqera.io/nextflow/strict-syntax) in Nextflow (specifically [string parameter changes](https://nf-co.re/blog/2026/parameter-types)), the pipeline currently only supports Nextflow version 25.10.4.
+> Due to [various](https://nf-co.re/docs/developing/migration-guides/strict-syntax) [changes](https://docs.seqera.io/nextflow/strict-syntax) in Nextflow (specifically [string parameter changes](https://nf-co.re/blog/2026/parameter-types)), the pipeline currently only supports the legacy parser (e.g. export `NXF_SYNTAX_PARSER=v1`) or nextflow versions `<26.04` (e.g. `export NXF_VER=25.10.4`).
 
 ### Reference genome files
 
