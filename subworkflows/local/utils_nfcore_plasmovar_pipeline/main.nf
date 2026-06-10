@@ -239,13 +239,12 @@ def validateInputSamplesheet(input) {
             error("Please check your samplesheet for consistent single/paired-end entries per sample.")
         }
 
-        // Check fi samples can be distinguished based on lane/flowcell/library information
+        // Check if samples can be distinguished based on lane/flowcell/library information
         def identifiers = metas.collect { "${it.flowcell ?: 'NA'}_${it.lane ?: 'NA'}_${it.library ?: 'NA'}" }
         if (identifiers.size() != identifiers.unique().size()) {
             log.error("""
                 Sample '${sample}' has duplicate flowcell/lane/library combinations.
                 Each sample must have a unique combination of flowcell, lane and library identifiers.
-                Flowcell IDs were automatically extracted from FASTQ headers.
             """.stripIndent())
             error("Please check samplesheet for duplicate entries.")
         }
@@ -301,7 +300,8 @@ def detectOrValidateField(meta, field, fastq_1, fastq_2, strict) {
     def provided = meta[field]
 
     if (provided) {
-        if (detected_r1 && provided != detected_r1) {
+        // Cast explicitly as strings to avoid incorrect comparisons between string and integer
+        if (detected_r1 && provided.toString() != detected_r1.toString()) {
             def msg = "${field.capitalize()} mismatch for '${meta.id}': " +
                       "samplesheet='${provided}', detected='${detected_r1}' from '${fastq_1}'."
             if (strict) {
@@ -390,10 +390,10 @@ def extractLaneFromFastqHeader(path) {
 
     if (fields.size() >= 7) {
         // CASAVA 1.8+ format
-        return "L${fields[3]}"
+        return fields[3].toString()
     } else if (fields.size() == 5) {
         // Old Illumina format
-        return "L${fields[1]}"
+        return fields[1].toString()
     }
     return null
 }
