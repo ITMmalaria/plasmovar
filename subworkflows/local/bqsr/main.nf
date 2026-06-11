@@ -8,11 +8,11 @@
 
 // TODO: add fall-back to uncalibrated bam in case of applyBQSR errors
 
-include { GATK4_BEDTOINTERVALLIST } from '../../../modules/nf-core/gatk4/bedtointervallist/main'
-include { GATK4_INTERVALLISTTOOLS } from '../../../modules/nf-core/gatk4/intervallisttools/main'
-include { GATK4_BASERECALIBRATOR  } from '../../../modules/nf-core/gatk4/baserecalibrator/main'
-include { GATK4_GATHERBQSRREPORTS } from '../../../modules/nf-core/gatk4/gatherbqsrreports/main'
-include { GATK4_APPLYBQSR         } from '../../../modules/nf-core/gatk4/applybqsr/main'
+include { GATK4_BEDTOINTERVALLIST as BQSR_BEDTOINTERVALLIST } from '../../../modules/nf-core/gatk4/bedtointervallist/main'
+include { GATK4_INTERVALLISTTOOLS as BQSR_INTERVALLISTTOOLS } from '../../../modules/nf-core/gatk4/intervallisttools/main'
+include { GATK4_BASERECALIBRATOR                            } from '../../../modules/nf-core/gatk4/baserecalibrator/main'
+include { GATK4_GATHERBQSRREPORTS                           } from '../../../modules/nf-core/gatk4/gatherbqsrreports/main'
+include { GATK4_APPLYBQSR                                   } from '../../../modules/nf-core/gatk4/applybqsr/main'
 
 workflow BQSR {
 
@@ -61,11 +61,11 @@ workflow BQSR {
         // Convert BED to GATK IntervalList
         bed_file = file(bed, checkIfExists: true)
         ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
-        GATK4_BEDTOINTERVALLIST(ch_ref_bed, ch_ref_dict)
+        BQSR_BEDTOINTERVALLIST(ch_ref_bed, ch_ref_dict)
 
         // Combine intervals into limited number of separate interval_list files for scatter-gather parallel processing
-        GATK4_INTERVALLISTTOOLS(GATK4_BEDTOINTERVALLIST.out.interval_list)
-        ch_intervals = GATK4_INTERVALLISTTOOLS.out.interval_list
+        BQSR_INTERVALLISTTOOLS(BQSR_BEDTOINTERVALLIST.out.interval_list)
+        ch_intervals = BQSR_INTERVALLISTTOOLS.out.interval_list
             // [ [interval_genome_meta.id], [interval_list, interval_list, ...] ] (single element)
             .transpose()
             // [ [interval_genome_meta.id], interval_list ] (multiple elements)
