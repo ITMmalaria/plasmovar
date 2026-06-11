@@ -802,6 +802,11 @@ workflow PLASMOVAR {
                 error "Stopping pipeline. Please provide missing files."
             }
 
+            if (params.bqsr_bed && !params.bqsr_scatter) {
+                log.error("Custom BQSR intervals were provided, but scatter mode was disabled.")
+                error "Stopping pipeline. Please enable scatter mode when providing BQSR intervals."
+            }
+
             BQSR(
                 ch_bam_bai_intervals,
                 ch_ref_fasta,
@@ -809,6 +814,8 @@ workflow PLASMOVAR {
                 ch_ref_dict,
                 params.bqsr_known_sites_vcf,
                 params.bqsr_known_sites_tbi,
+                params.bqsr_scatter,
+                params.bqsr_bed,
             )
             // TODO: add table output to multiqc channel
 

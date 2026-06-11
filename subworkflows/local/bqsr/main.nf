@@ -8,6 +8,8 @@
 
 // TODO: add fall-back to uncalibrated bam in case of applyBQSR errors
 
+include { GATK4_BEDTOINTERVALLIST } from '../../../modules/nf-core/gatk4/bedtointervallist/main'
+include { GATK4_INTERVALLISTTOOLS } from '../../../modules/nf-core/gatk4/intervallisttools/main'
 include { GATK4_BASERECALIBRATOR  } from '../../../modules/nf-core/gatk4/baserecalibrator/main'
 include { GATK4_GATHERBQSRREPORTS } from '../../../modules/nf-core/gatk4/gatherbqsrreports/main'
 include { GATK4_APPLYBQSR         } from '../../../modules/nf-core/gatk4/applybqsr/main'
@@ -21,6 +23,8 @@ workflow BQSR {
     ch_ref_dict             // [ [meta], dict]
     known_sites_vcf         // path to vcf file
     known_sites_tbi         // path to vcf tbi file
+    scatter                 // boolean
+    bed                     // [bed]
 
     main:
 
@@ -30,9 +34,65 @@ workflow BQSR {
     tbi = file(known_sites_tbi, checkIfExists: true)
     ch_known_sites_tbi = channel.value([[id: "known_sites"], tbi])
 
+    // Remove intervals if scatter mode was disabled
+    // Can help avoid problems if known site vcf contains fewer regions than remainder of the analysis calls for
+    if (!scatter) {
+        ch_bam_baserecalibator = ch_bam_bai_intervals
+            .map{ meta, bam, bai, _interval ->
+                def sample_meta = (meta - [ interval_name: meta.interval_name ]) + [ id: meta.sample ]
+                tuple(sample_meta, bam, bai)
+            }
+            // reduce to a single bam per sample now that intervals are removed
+            .unique()
+            // add empty element for GATK4_BASERECALIBRATOR
+            .map { meta, bam, bai -> [meta, bam, bai, []]}
+    }
+    // if custom interval (bed) file is provided, convert to interval_list and re-create bam channel
+    // TODO: these steps could be combined into a subworkflow, which could then be used both here and for the main GATK interval creation step
+    // TODO: import modules as *_BQSR, so that separate modules.config settings can be used for e.g. publishDir. Or ensure different meta.id.
+    else if (bed) {
+        // Convert BED to GATK IntervalList
+        bed_file = file(bed, checkIfExists: true)
+        ch_ref_bed = channel.value([[id: bed_file.simpleName], bed_file])
+        GATK4_BEDTOINTERVALLIST(ch_ref_bed, ch_ref_dict)
+
+        // Split chrom/contigs into separate interval_list files for scatter-gather parallel processing
+        GATK4_INTERVALLISTTOOLS(GATK4_BEDTOINTERVALLIST.out.interval_list)
+        ch_intervals = GATK4_INTERVALLISTTOOLS.out.interval_list
+            // [ [interval_genome_meta.id], [interval_list, interval_list, ...] ] (single element)
+            .transpose()
+            // [ [interval_genome_meta.id], interval_list ] (multiple elements)
+
+        ch_bam_baserecalibator = ch_bam_bai_intervals
+            // remove intervals
+            .map{ meta, bam, bai, _interval ->
+                def sample_meta = (meta - [ interval_name: meta.interval_name ]) + [ id: meta.sample ]
+                tuple(sample_meta, bam, bai)
+            }
+            // reduce to a single bam per sample now that intervals are removed
+            .unique()
+            // re-combine with custom bqsr intervals
+            .combine(ch_intervals)
+            .map { bam_meta, bam, bai, interval_genome_meta, interval ->
+                def combined_meta = bam_meta + [
+                    // add unique id per sample/interval combination
+                    id: "${bam_meta.id}_${interval.simpleName}",
+                    genome_id: interval_genome_meta.id,
+                    interval_name: interval.simpleName
+                ]
+                [ combined_meta, bam, bai, interval ]
+            }
+            // .view()
+            // [ [combined_meta.id, combined_meta.sample, combined_meta.num_entries, combined_meta.multiple_lanes, combined_meta.multiple_libraries, combined_meta.data_type, combined_meta.genome_id, combined_meta.interval_name], bam, bai, interval_list ]
+    }
+    // normal scatter mode using automatic gatk intervals
+    else {
+        ch_bam_baserecalibator = ch_bam_bai_intervals
+    }
+
     // Run BaseRecalibrator
     GATK4_BASERECALIBRATOR(
-        ch_bam_bai_intervals,
+        ch_bam_baserecalibator,
         ch_ref_fasta,
         ch_ref_fai,
         ch_ref_dict,
@@ -40,30 +100,36 @@ workflow BQSR {
         ch_known_sites_tbi
     )
 
-    // Gather scattered tables into a single table for GATK4_APPLYBQSR
-    ch_table = GATK4_BASERECALIBRATOR.out.table  // [[meta], table]
-        // 1) remove interval-specific meta field
-        // 2) re-create original sample id without interval suffix
-        // to make meta identical for all tables belonging to a particular sample
-        // and allow grouping of table file paths into a single element (per sample)
-        .map { meta, table ->
-            def new_meta = (meta - [ interval_name: meta.interval_name ]) + [ id: meta.sample ]
-            // If meta were to change in the future, it would be more robust to only retain specific meta fields instead of omitting the ones that might interfere
-            // new_meta = meta.subMap(['id', 'sample', ...]) + [id: meta.sample]
-            tuple(new_meta, table)
-        }
-        .groupTuple()
+    // Gather scattered tables into a single table for GATK4_APPLYBQSR in scatter mode (either custom or automatic intervals)
+    if (scatter || bed) {
+        ch_table = GATK4_BASERECALIBRATOR.out.table  // [[meta], table]
+            // 1) remove interval-specific meta field
+            // 2) re-create original sample id without interval suffix
+            // to make meta identical for all tables belonging to a particular sample
+            // and allow grouping of table file paths into a single element (per sample)
+            .map { meta, table ->
+                def new_meta = (meta - [ interval_name: meta.interval_name ]) + [ id: meta.sample ]
+                // If meta were to change in the future, it would be more robust to only retain specific meta fields instead of omitting the ones that might interfere
+                // new_meta = meta.subMap(['id', 'sample', ...]) + [id: meta.sample]
+                tuple(new_meta, table)
+            }
+            .groupTuple()
 
-    GATK4_GATHERBQSRREPORTS(ch_table)
+        GATK4_GATHERBQSRREPORTS(ch_table)
+        // Key by sample id explicitly, because full meta differs (interval_name is missing from table channel)
+        ch_table = GATK4_GATHERBQSRREPORTS.out.table.map { meta, table -> [meta.sample, table] }
+    }
+    // Combine single table with bam files in no scatter mode
+    else if (!scatter) {
+        ch_table = GATK4_BASERECALIBRATOR.out.table.map { meta, table -> [meta.sample, table] }
+    }
 
     // Combine BAM with recalibration table
     // Key by sample id explicitly, because full meta differs (interval_name is missing from table channel)
     // Use join, not combine, because only a single bam files needs to be recalibrated per sample, not one per interval
     ch_bam_bai_table = ch_bam_bai_intervals
         .map { meta, bam, bai, _interval -> [meta.sample, meta, bam, bai] }
-        .join(
-            GATK4_GATHERBQSRREPORTS.out.table.map { meta, table -> [meta.sample, table] },
-            by: 0)
+        .join(ch_table, by: 0)
         // Re-order to match expected input of GATK4_APPLYBQSR
         // Pass empty list for the expected intervals input of GATK4_APPLYBQSR,
         // since it should not be run in scatter mode according to GATK.
