@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). 
 Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re/docs/specifications/pipelines/requirements/semantic_versioning).
 
+## v - [date]
+
+### `Added`
+
+- Base quality score recalibration (BQSR), or more specifically the `gatk BaseRecalibrator` step, can now be run without scattering/parallellization over intervals (`--bqsr_scatter false`), or by scattering over distinct intervals from those used in the rest of the pipeline (`--bqsr_bed <bed-file>`). This avoids problems when the known sites VCF contains different genomic regions from those used elsewhere in the pipeline.
+
 ## v0.2.0 - [2026-06-10]
 
 ### `Improved`

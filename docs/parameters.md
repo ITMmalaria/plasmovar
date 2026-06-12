@@ -23,7 +23,7 @@ Reference genome related files and options required for the workflow.
 | `reference_fasta` | Path to main reference genome in FASTA format. <details><summary>Help</summary><small>This parameter is *mandatory*. If you don't have a bwa index available for the main parasite genome, this will be generated for you automatically. Combine with `--save_index` to save bwa index for future runs.</small></details>| `string` |  | True |  |
 | `reference_index` | Optional path to directory housing BWA index files. <details><summary>Help</summary><small>Expected files are `*.{amb,.ann,.bwt,.pac,.sa}`. Files should have the same name as the main parasite reference genome FASTA.</small></details>| `string` |  |  |  |
 | `save_index` | Whether to save the generated bwa reference index. <details><summary>Help</summary><small>Set to true to save the generated bwa index for the main parasite reference. The bwa index can be supplied to future runs via `--reference_index` to avoid unnecessary recomputation.</small></details>| `boolean` | True |  |  |
-| `reference_bed` | Optional path to a BED file containing the genomic regions to restrict variant calling to. <details><summary>Help</summary><small>If not supplied, all chromosomes/contigs regions defined in the fasta reference will be used. These will be grouped into a manageable number of interval_lists to avoid problems with highly fragmented genomes with many short contigs.</small></details>| `string` |  |  |  |
+| `reference_bed` | Optional path to a BED file containing the genomic regions to restrict variant calling to and to scatter/parallellize the main gatk variant calling steps by. <details><summary>Help</summary><small>If not supplied, all chromosomes/contigs (genomic regions) defined in the reference fasta will be used. These will be grouped into a manageable number of interval_lists to avoid problems with highly fragmented genomes with many short contigs. The number of which can be controlled via `scatter_count`. Note that a separate bed file can be provided for the BQSR step if needed.</small></details>| `string` |  |  |  |
 
 ## Skipping options
 
@@ -117,8 +117,8 @@ Configure intervals of genomic regions for scatter/gather parallelization of GAT
 
 | Parameter | Description | Type | Default | Required | Hidden |
 |-----------|-----------|-----------|-----------|-----------|-----------|
-| `scatter_count` | Maximum number of files into which to scatter the intervals for parallel processing. | `integer` | 20 |  |  |
-| `save_interval_scatter` | Save scattered interval lists for debugging purposes. | `boolean` | False |  |  |
+| `scatter_count` | Maximum number of interval_list files into which the provided intervals (provided by `reference_bed` or automatically extracted from the reference genome fasta) will be combined for the scattered/parallel processing of the GATK steps. | `integer` | 20 |  |  |
+| `save_interval_scatter` | Save scattered interval lists (for debugging purposes). | `boolean` | False |  |  |
 
 ## GATK base quality score recalibration (BQSR) options
 
@@ -129,6 +129,8 @@ Configure options for BQSR.
 | `run_bqsr` | Whether to run BQSR or not. Disabled by default. | `boolean` | False |  |  |
 | `bqsr_known_sites_vcf` | VCF file with known sites to be used for BQSR. | `string` |  |  |  |
 | `bqsr_known_sites_tbi` | Index file for VCF with known sites to be used for BQSR. | `string` |  |  |  |
+| `bqsr_scatter` | Whether to run BaseRecalibrator in scatter mode (= parallellized by intervals) or not. Enabled by default. <details><summary>Help</summary><small>Toggling this off (or providing alternative intervals for the BQSR step only via `bqsr_bed`) can avoid issues when the known sites VCF contains different genomic regions than those used by the other steps in the pipeline.</small></details>| `boolean` | True |  |  |
+| `bqsr_bed` | Optional path to a BED file containing the intervals to scatter BQSR by and also restrict itself to. <details><summary>Help</summary><small>If not supplied, the intervals will be the same as those used by the other GATK steps (which are either based on the provided `reference_bed` or automatically extracted from the reference genome fasta).</small></details>| `string` |  |  |  |
 
 ## Variant calling options
 
