@@ -44,7 +44,6 @@ include { MOSDEPTH                               } from '../modules/nf-core/mosd
 include { GATK4_CREATESEQUENCEDICTIONARY         } from '../modules/nf-core/gatk4/createsequencedictionary/main'
 include { GATK4_BEDTOINTERVALLIST                } from '../modules/nf-core/gatk4/bedtointervallist/main'
 include { GATK4_INTERVALLISTTOOLS                } from '../modules/nf-core/gatk4/intervallisttools/main'
-include { BIN_INTERVALS                          } from '../modules/local/bin_intervals/main'
 include { BQSR                                   } from '../subworkflows/local/bqsr/main.nf'
 include { GATK4_HAPLOTYPECALLER                  } from '../modules/nf-core/gatk4/haplotypecaller/main'
 include { GATK4_GENOMICSDBIMPORT                 } from '../modules/nf-core/gatk4/genomicsdbimport/main'
