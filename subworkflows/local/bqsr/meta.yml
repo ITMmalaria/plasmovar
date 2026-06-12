@@ -6,6 +6,8 @@ keywords:
   - BQSR
   - base quality score recalibration
 components:
+  - gatk4/bedtointervallist
+  - gatk4/intervallisttools
   - gatk4/baserecalibrator
   - gatk4/gatherbqsrreports
   - gatk4/applybqsr
@@ -71,6 +73,19 @@ input:
         - value:
             type: string
             description: file path to VCF index file (tbi); not a channel with a file type element
+  - scatter:
+      description: Boolean to toggle scatter mode.
+      structure:
+        - value:
+            type: boolean
+            description: Whether to run BaseRecalibrator in scatter mode (= parallellized by intervals) or not.
+  - bed:
+      description: Optional path to a BED file containing the intervals to scatter BQSR by and also restrict itself to.
+      structure:
+        - bed:
+            type: file
+            description: bed file
+            pattern: "bed"
 
 output:
   - bam:
@@ -93,6 +108,16 @@ output:
             type: file
             description: BAM index file
             pattern: "*.bai"
+  - table:
+        description: Channel containing recalibration table
+        structure:
+        - meta:
+            type: map
+            description: Metadata map
+        - "*.table":
+            type: file
+            description: Recalibration table from BaseRecalibrator
+            pattern: "*.{table}"
 
 authors:
   - "@pmoris"
