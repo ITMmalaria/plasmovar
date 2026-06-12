@@ -90,8 +90,8 @@
                     "exists": true,
                     "mimetype": "text/plain",
                     "pattern": "^\\S+\\.bed?(\\.gz)?$",
-                    "description": "Optional path to a BED file containing the genomic regions to restrict variant calling to.",
-                    "help_text": "If not supplied, all chromosomes/contigs regions defined in the fasta reference will be used. These will be grouped into a manageable number of interval_lists to avoid problems with highly fragmented genomes with many short contigs.",
+                    "description": "Optional path to a BED file containing the genomic regions to restrict variant calling to and to scatter/parallellize the main gatk variant calling steps by.",
+                    "help_text": "If not supplied, all chromosomes/contigs (genomic regions) defined in the reference fasta will be used. These will be grouped into a manageable number of interval_lists to avoid problems with highly fragmented genomes with many short contigs. The number of which can be controlled via `scatter_count`. Note that a separate bed file can be provided for the BQSR step if needed.",
                     "errorMessage": "Input must be a .bed file (optionally gzipped).",
                     "fa_icon": "fa-solid fa-book"
                 }
@@ -445,13 +445,13 @@
                 "scatter_count": {
                     "type": "integer",
                     "default": 20,
-                    "description": "Maximum number of files into which to scatter the intervals for parallel processing.",
+                    "description": "Maximum number of interval_list files into which the provided intervals (provided by `reference_bed` or automatically extracted from the reference genome fasta) will be combined for the scattered/parallel processing of the GATK steps.",
                     "fa_icon": "fas fa-th"
                 },
                 "save_interval_scatter": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Save scattered interval lists for debugging purposes.",
+                    "description": "Save scattered interval lists (for debugging purposes).",
                     "fa_icon": "fas fa-download"
                 }
             }
@@ -486,6 +486,24 @@
                     "errorMessage": "Input must be a .tbi file (optionally gzipped).",
                     "fa_icon": "fas fa-file",
                     "help_text": ""
+                },
+                "bqsr_scatter": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to run BaseRecalibrator in scatter mode (= parallellized by intervals) or not. Enabled by default.",
+                    "fa_icon": "fas fa-toggle-on",
+                    "help_text": "Toggling this off (or providing alternative intervals for the BQSR step only via `bqsr_bed`) can avoid issues when the known sites VCF contains different genomic regions than those used by the other steps in the pipeline."
+                },
+                "bqsr_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.bed?(\\.gz)?$",
+                    "description": "Optional path to a BED file containing the intervals to scatter BQSR by and also restrict itself to.",
+                    "help_text": "If not supplied, the intervals will be the same as those used by the other GATK steps (which are either based on the provided `reference_bed` or automatically extracted from the reference genome fasta).",
+                    "errorMessage": "Input must be a .bed file (optionally gzipped). The intervals will be combined into the same interval_lists as the main gatk ones, according to the `scatter_count` parameter.",
+                    "fa_icon": "fa-solid fa-book"
                 }
             }
         },
