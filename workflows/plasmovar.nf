@@ -818,6 +818,7 @@ workflow PLASMOVAR {
                 params.bqsr_bed,
             )
             // TODO: add table output to multiqc channel
+            ch_multiqc_files = ch_multiqc_files.mix(BQSR.out.recalibration_table.collect{it[1]})
 
             // Prepare channel for HaplotypeCaller by recombining bam files with intervals
             ch_bam_bai_intervals = BQSR.out.bam_recalibrated

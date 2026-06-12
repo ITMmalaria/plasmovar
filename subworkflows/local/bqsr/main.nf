@@ -156,8 +156,9 @@ workflow BQSR {
     // > BQSR is performed twice. The second pass is optional, only required to produce a recalibration report.
 
     emit:
-    bam_recalibrated = GATK4_APPLYBQSR.out.bam  // [[meta], bam]
-    bai_recalibrated = GATK4_APPLYBQSR.out.bai  // [[meta], bai]
+    bam_recalibrated    = GATK4_APPLYBQSR.out.bam  // [[meta], bam]
+    bai_recalibrated    = GATK4_APPLYBQSR.out.bai  // [[meta], bai]
+    recalibration_table = ch_table                 // [[meta], table]
 }
 
 // Info on scatter-gather approach for BQSR
