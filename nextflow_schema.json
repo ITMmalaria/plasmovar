@@ -98,7 +98,7 @@
             }
         },
         "skipping_options": {
-            "title": "Skipping options",
+            "title": "Skipping options and order of steps",
             "type": "object",
             "description": "Disable specific steps of the pipeline.",
             "fa_icon": "fa-solid fa-forward-fast",
@@ -171,6 +171,13 @@
                     "default": false,
                     "description": "Only perform FastQ Screen steps.",
                     "help_text": "If enabled, only FastQ Screen step will be performed (including building of reference indces if required).",
+                    "fa_icon": "fa-solid fa-forward-fast"
+                },
+                "trimming_before_hostremoval": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to perform trimming before or after host read removal.",
+                    "help_text": "",
                     "fa_icon": "fa-solid fa-forward-fast"
                 }
             }
