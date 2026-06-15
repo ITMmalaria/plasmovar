@@ -54,6 +54,8 @@ include { VARIANT_FILTERING_VQSR                 } from '../subworkflows/local/v
 // Variant annotation
 include { SNPEFF_BUILD                           } from '../modules/local/snpeff/build/main'
 include { SNPEFF_ANNOTATE                        } from '../modules/local/snpeff/annotate/main'
+include { HTSLIB_BGZIPTABIX as BGZIP_SNPEFF_VCF  } from '../modules/nf-core/htslib/bgziptabix/main'
+ // nf-core utils
 include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -1021,7 +1023,16 @@ workflow PLASMOVAR {
             ch_ref_fasta.map { meta, _fasta -> meta.id }
         )
         ch_multiqc_files = ch_multiqc_files.mix(SNPEFF_ANNOTATE.out.report.collect{it[1]})
+
+        BGZIP_SNPEFF_VCF(
+            SNPEFF_ANNOTATE.out.vcf.map { meta, vcf -> [meta, vcf, [], []] },
+            "compress",
+            true,
+            "vcf"
+        )
     }
+
+
 
     // TODO: add step for gatk VariantsToTable -V "${ann_dir}/${species}/combined.filter_added.ann.vcf" -F CHROM -F POS -F TYPE -GF GT -O "${ann_dir}/${species}/combined.filter_added.table"
 
