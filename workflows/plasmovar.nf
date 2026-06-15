@@ -245,8 +245,7 @@ workflow PLASMOVAR {
         // ALSO CHANGE MODULES.CONFIG e.g.             withName: '.*:FASTQ_FASTQC_UMITOOLS_FASTP:FASTP'
     // TODO: add option for single-ended reads
     // TODO: check fastp on split fastq option for speed-up, as used by sarek: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
-
-    if (!skip_trimming) {
+    if (params.trimming_before_hostremoval && !skip_trimming) {
         // create expected input for fastp module using read adapter file path from input parameters
         // channel: [ val(meta), [ path(reads) ], path(adapters) ]
         ch_fastp_input = ch_fastq
@@ -465,6 +464,31 @@ workflow PLASMOVAR {
         }
         // Rename output channel using the original generic name to pass it on to downstream processes, since this step was optional
         ch_fastq = ch_fastq_hostremoved
+    }
+
+    if (!params.trimming_before_hostremoval && !skip_trimming) {
+        // create expected input for fastp module using read adapter file path from input parameters
+        // channel: [ val(meta), [ path(reads) ], path(adapters) ]
+        ch_fastp_input = ch_fastq
+            .map { meta, reads -> [ meta, reads, params.fastp_adapter_fasta ?: [] ] }
+
+        FASTP (
+            ch_fastp_input,
+            false,  // discard_trimmed_pass - Specify true to not write any reads that pass trimming thresholds. This can be used to use fastp for the output report only. Previously set to `!params.fastp_save_trimmed`
+            params.fastp_save_trimmed_fail,
+            params.fastp_save_merged
+        )
+        ch_fastq_trimmed = FASTP.out.reads
+        ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]})  // MultiQC's fastp module relies only on the json output - https://multiqc.info/modules/fastp/
+
+        // Re-run fastQC on trimmed reads
+        if (!skip_qc) {
+            FASTQC_TRIMMED(ch_fastq_trimmed)
+            ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED.out.zip.collect{it[1]})
+        }
+
+        // Rename output channel using the original generic name to pass it on to downstream processes, since this step was optional
+        ch_fastq = ch_fastq_trimmed
     }
 
     //
