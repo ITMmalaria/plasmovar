@@ -504,6 +504,13 @@
                     "help_text": "If not supplied, the intervals will be the same as those used by the other GATK steps (which are either based on the provided `reference_bed` or automatically extracted from the reference genome fasta).",
                     "errorMessage": "Input must be a .bed file (optionally gzipped). The intervals will be combined into the same interval_lists as the main gatk ones, according to the `scatter_count` parameter.",
                     "fa_icon": "fa-solid fa-book"
+                },
+                "save_bqsr_bam": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Whether to save recalibrated BAM files. Defaults to false.",
+                    "fa_icon": "fas fa-toggle-on",
+                    "help_text": ""
                 }
             }
         },
