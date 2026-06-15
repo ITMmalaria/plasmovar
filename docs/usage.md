@@ -226,3 +226,32 @@ We recommend adding the following line to your environment to limit this (typica
 ```bash
 NXF_OPTS='-Xms1g -Xmx4g'
 ```
+
+<!-- TODO
+## Host read removal
+
+- recommended index file + how to construct it
+- default parameters used by deacon
+- order: before or after trimming
+
+## Base quality score recalibration
+
+- known sites description
+- Describe concerns around BQSR
+  See concerns:
+  - https://pmc.ncbi.nlm.nih.gov/articles/PMC5048557/
+  - https://github.com/google/deepvariant/blob/r1.8/docs/deepvariant-details.md#input-assumptions
+  > Running BQSR results in a small decrease in accuracy => deepvariant was trained on raw scores, so might not apply to GATK
+  >  Modern base quality is well calibrated. At the standard 30x coverage, minor quality changes also barely matter. This is why all companies are binning quality. Illumina has done extensive evaluation and confirmed the effectiveness of binning. While raw base quality is estimated from signals and is not biased towards samples, BQSR introduces sample biases and reference biases. I have seen it shifts overall properties of the calls. BQSR also completely defeats the purpose of binning and doubles file sizes. I couldn't find papers showing BQSR is beneficial. GIAB folks, the group understands variant calling most, rarely runs BQSR, either. Don't waste your resources.
+  https://www.biostars.org/p/9605712/
+  https://old.reddit.com/r/bioinformatics/comments/1syr32x/how_to_run_bqsr_for_mouse_wgs_data/
+
+
+## Variant quality score recalibration
+
+- known sites description
+
+## Genomic regions and intervals
+
+- padding recommendations when restricting analysis to a subset of regions or a panel of genomic targets
+-->

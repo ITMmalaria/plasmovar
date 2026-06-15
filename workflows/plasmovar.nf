@@ -1,18 +1,11 @@
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    IMPORT LOCAL MODULES / SUBWORKFLOWS / FUNCTIONS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    IMPORT NF-CORE MODULES / SUBWORKFLOWS / FUNCTIONS
+    IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
 // Quality control and pre-processing
+include { addReadgroupToMeta                     } from '../subworkflows/local/utils_nfcore_plasmovar_pipeline'
 include { FASTQC                                 } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIMMED               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_DECONTAMINATED        } from '../modules/nf-core/fastqc/main'
@@ -60,67 +53,6 @@ include { paramsSummaryMap                       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText                 } from '../subworkflows/local/utils_nfcore_plasmovar_pipeline'
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    DEFINE ADDITIONAL FUNCTIONS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-// TODO: move to samplesheet prep subworkflow?
-
-// Add GATK read group to meta (and remove redundant lane, library and flowcell info)
-// Adapted from nf-core/sarek: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L940
-// See read group info here: https://gatk.broadinstitute.org/hc/en-us/articles/360035890671-Read-groups
-// List of RG fields is defined by SAM format: https://samtools.github.io/hts-specs/SAMv1.pdf
-// Recommended usage: https://support.sentieon.com/appnotes/read_groups/
-def addReadgroupToMeta(meta, files) {
-    // Define RG values, only adding non-empty values
-    // This avoids problems with Picard and the need for the `VALIDATION_STRINGENCY LENIENT` option,
-    // since there will not be any empty fields like CN in the following example:
-    // @RG	ID:106264-002-079.22NY35LT3.L007	CN:	PU:22NY35LT3.L007	SM:106264-002-079	LB:106264-002-079	PL:ILLUMINA
-
-    // If we cannot read the flowcell ID from the fastq file, then we don't use it
-    def RG_ID = meta.flowcell ? "${meta.sample}.${meta.flowcell}.${meta.lane}" : "${meta.sample}.${meta.lane}"
-
-    // For LB, check if library is defined in input samplesheet (trim handles case of empty string)
-    def RG_LB = meta.library?.trim() ? "${meta.sample}.${meta.library}" : "${meta.sample}"
-
-    // PU should be set to combination of flowcell and lane.
-    def RG_PU = meta.flowcell ? "${meta.flowcell}.${meta.lane}" : null
-
-    def RG_map = [
-        ID: RG_ID,
-        SM: meta.sample,
-        LB: RG_LB,
-        PL: params.seq_platform,                // defaults to ILLUMINA (nextflow.config)
-        CN: params.seq_center?.trim() ?: null,  // most likely blank
-        PU: RG_PU,                              // used by BQSR if present, defaults to ID otherwise
-    ]
-
-    // Build RG string: filter out empty fields and format as RG string `key:value`
-    def RG_fields = RG_map
-        // example input map: [ID: "sample1", SM: "sample1", CN: null, PU: "flowcell.L001"]
-        .findAll { _key, value -> value != null && value != ''}
-        // returns map: [ID: "sample1", SM: "sample1", PU: "flowcell.L001"]
-        .collect { key, value -> "${key}:${value}" }
-        // returns list: ["ID:sample1", "SM:sample1", "PU:flowcell.L001"]
-
-    def read_group = "\"@RG\\t${RG_fields.join('\\t')}\""
-
-    meta  = meta - meta.subMap('lane', 'flowcell', 'library') + [read_group: read_group.toString()]
-
-    return [ meta, files ]
-}
-
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    VALIDATE INPUTS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-// TODO: see rnaseq example bbsplit fasta list
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -205,26 +137,15 @@ workflow PLASMOVAR {
             skip_annotation     = true
         }
     }
+
     // TODO: Allow index only option to build indices for all required steps (bwa alignment, host decontamination, etc.)
     // TODO: move reference genome + index building logic to separate subworkflows. Decide if everything should be bundled (easier for the only_index option) or included in the relevant step (e.g. build index for deacon in deacon section). Check how nf-core/rnaseq handles genome prep logic.
-
-    // TODO create channel holding reference genome
-    // Note: bwa_index expects meta channel, whereas bbsplit_indexer just needs a path
-    // ch_reference = channel.value(file(params.reference_fasta))
-    // ch_reference = channel.fromPath(params.reference_fasta).map{ref -> tuple (ref.simpleName, ref)}
-    // reference = [[ id:'reference', primary:true ], file(params.reference_fasta)]
 
     // TODO: allow either a single fasta reference file to be supplied or multiple ones
     // via samplesheet column or via extra file listing species name + reference path
     // optionally providing pre-built indices (bwa, samtools, gatk, etc.)
     // for reference sheet example: https://nf-co.re/eager/dev/docs/usage#reference-input
     // also requires changes to bbsplit (needs both host and main reference)
-
-    // TODO: integrate all modules/subworkflows into multiQC: https://nf-co.re/docs/contributing/tutorials/adding_modules_to_pipelines
-
-    // TODO: https://nf-co.re/modules/fastqscreen_fastqscreen
-
-    // TODO: describe samplesheet columns in readme as done here https://nf-co.re/sarek/3.4.4/docs/usage/
 
     // TODO: test data -> see separate branch
 
@@ -236,13 +157,6 @@ workflow PLASMOVAR {
     // if (!params.genomes.containsKey(params.genome)) {
     //     error "Genome '${params.genome}' not found. Available: ${params.genomes.keySet().join(', ')}"
     // }
-
-    // // Create reference channels
-    // ch_fasta = channel.value([
-    //     [id: params.genome],
-    //     file(params.fasta)
-    // ])
-
 
     //
     // Import input data from samplesheet
@@ -256,12 +170,10 @@ workflow PLASMOVAR {
     //
     // Prepare reference genome and associated files
     //
+
     // TODO: add to subworkflow? Add indexing for which downstream steps?
 
     // Create channel containing the reference fasta
-    // ch_ref_fasta = channel.fromPath(params.reference_fasta)
-    //     .map { ref -> tuple([ id: ref.simpleName ], ref) }
-    //     .collect()   // or .first()
     def ref = file(params.reference_fasta, checkIfExists: true)
     def ref_basename = ref.simpleName
     ch_ref_fasta = channel.value(
@@ -279,8 +191,7 @@ workflow PLASMOVAR {
     ch_ref_fai = SAMTOOLS_FAIDX.out.fai.collect() // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz.fai] - will be a value channel because its input is one too
 
     // create combined channel as input for various downstream processes
-    // explicitly turn into a value channel to avoid downstream issues in e.g. samtools_sort,
-    // even though println ch_ref_fasta.getClass() suggests it already is (groovyx.gpars.dataflow.DataflowVariable)
+    // explicitly turn it into a value channel to avoid downstream issues in e.g. samtools_sort, even though println ch_ref_fasta.getClass() suggests it already is (groovyx.gpars.dataflow.DataflowVariable, instead of DataflowBroadcast)
     ch_ref_fasta_fai = ch_ref_fasta.join(ch_ref_fai).collect()    // [[id:Pf3D7_01_v3], /path/to/ref.fa.gz, /path/to/ref.fa.gz.fai]
 
     // Create or read bed file
@@ -314,6 +225,7 @@ workflow PLASMOVAR {
     //
     // Trim reads using fastp
     //
+
     // TODO: optionally switch to subworkflow:
         // https://nf-co.re/subworkflows/fastq_trim_fastp_fastqc => could work as is
         // https://nf-co.re/subworkflows/fastq_fastqc_umitools_fastp => convert to local subworkflow and omit redundant UMI module?
@@ -332,7 +244,8 @@ workflow PLASMOVAR {
         //                      3) --adapter_sequence_r1/2, 4) fasta file
         // ALSO CHANGE MODULES.CONFIG e.g.             withName: '.*:FASTQ_FASTQC_UMITOOLS_FASTP:FASTP'
     // TODO: add option for single-ended reads
-    // TODO: check fastp on split fastq option: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
+    // TODO: check fastp on split fastq option for speed-up, as used by sarek: https://nf-co.re/sarek/3.4.2/docs/usage/#split-fastq-files
+
     if (!skip_trimming) {
         // create expected input for fastp module using read adapter file path from input parameters
         // channel: [ val(meta), [ path(reads) ], path(adapters) ]
@@ -426,10 +339,8 @@ workflow PLASMOVAR {
 
     // TODO: add BWA decontamination option
     // TODO: move to subworkflow?
-    // TODO: use file with list of fasta reference paths and names?
-    // samplesheet could contain species
-    // cf. samplesheet could mention which species to map against in bbsplit (human) and fastq screen
-    // TODO: examples:
+    // TODO: use file with list of fasta reference paths and names? Or samplesheet could mention which species to map against (in bbsplit (human) and fastq screen)
+    // Examples:
     // https://github.com/nf-core/eager/blob/dev/modules/local/host_removal.nf
     // https://github.com/nf-core/taxprofiler/blob/1.1.7/subworkflows/local/shortread_hostremoval.nf
 
@@ -491,9 +402,8 @@ workflow PLASMOVAR {
         }
 
         // use Deacon for host read removal
-        // TODO: add prebuilt pangenome index https://github.com/bede/deacon?tab=readme-ov-file#prebuilt-indexes
+        // TODO: add prebuilt pangenome index https://github.com/bede/deacon?tab=readme-ov-file#prebuilt-indexes or refer to it in docs and host on zenodo
         // TODO: add deacon output to multiqc?
-        // TODO: check if all required deacon options are provided
         else if (params.hostremoval_method == "deacon") {
 
             // Check if required options are provided
@@ -514,8 +424,8 @@ workflow PLASMOVAR {
 
                 DEACON_INDEX(ch_deacon_fasta)
                 ch_deacon_index = DEACON_INDEX.out.index
-
             }
+
             // Retrieve host index from input parameters otherwise
             else {
                 // Check for redundant input options
@@ -530,6 +440,7 @@ workflow PLASMOVAR {
 
             // Subtract shared minimizers between parasite index and host index (see https://github.com/bede/deacon?tab=readme-ov-file#set-operations)
             if ( params.hostremoval_deacon_diff ) {
+                log.info("Reference genome will be subtracted from pre-built reference index for deacon host removal.")
                 DEACON_INDEX_DIFF(ch_ref_fasta, ch_deacon_index)
                 ch_deacon_index = DEACON_INDEX_DIFF.out.index.map{ meta, index ->
                     def index_id = "${meta.id}_diff_${ref_basename}"
@@ -542,7 +453,6 @@ workflow PLASMOVAR {
                 .combine(ch_deacon_index)
                 .map { meta, reads, _meta_index, index -> [ meta, index, reads] }
 
-            // TODO check depletion vs search mode vs benchmarks and options https://github.com/bede/deacon
             // Filter reads using deacon against host index
             DEACON_FILTER(ch_deacon_input)
             ch_fastq_hostremoved = DEACON_FILTER.out.fastq_filtered
@@ -561,7 +471,7 @@ workflow PLASMOVAR {
     // Create bwa index for reference genome if index is not already provided
     //
 
-    // TODO: move into subworkflow
+    // TODO: move into subworkflow?
 
     // Construct bwa index for the reference fasta if it is not supplied by the user
     if (!params.reference_index) {
@@ -623,6 +533,7 @@ workflow PLASMOVAR {
     //
     // bwa alignment to reference genome
     //
+
     if (!skip_alignment) {
 
         // Optionally sort fastq reads to make bwa deterministic - can have high memory requirements
@@ -641,15 +552,16 @@ workflow PLASMOVAR {
         )
         ch_bam = BWA_MEM.out.bam
 
-    // TODO: optionally enable CRAM output
+        // TODO: optionally enable CRAM output
 
-    // TODO: when to combine runs/lanes from the same sample/library? how can stalling be avoided?
-    // old sarek approach: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L272
-    // new sarek approach: https://github.com/nf-core/sarek/blob/20f41d1ce8b7ba296ee22adc71fe2da2ebcae93f/subworkflows/local/fastq_preprocess_gatk/main.nf#L163
+        // TODO: avoid stalling when combining runs/lanes from the same sample/library
+        // old sarek approach: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L272
+        // new sarek approach: https://github.com/nf-core/sarek/blob/20f41d1ce8b7ba296ee22adc71fe2da2ebcae93f/subworkflows/local/fastq_preprocess_gatk/main.nf#L163
 
         //
          // Mark duplicates using Picard and merge reads derived from same sample using RG values
         //
+        // TODO: order bams to improve reproducibility for validation testing?
 
         // Group multi-lane/library samples by creating tuple with sample as grouping key
         ch_bam_grouped = ch_bam
@@ -660,6 +572,10 @@ workflow PLASMOVAR {
             .groupTuple()
             .map { meta, bam -> [ [ id: meta.sample ] +  meta, bam ] }  // add new (sample-level) id
 
+        // TODO make markdup optional for amplicon analysis => need to merge bams in another way
+        // https://sites.google.com/a/broadinstitute.org/legacy-gatk-documentation/frequently-asked-questions/6057-At-what-point-should-I-merge-read-group-BAM-files-belonging-to-the-same-sample-into-a-single-file
+        // MergeSamFiles (Picard)
+
         GATK4_MARKDUPLICATES(
             ch_bam_grouped,
             ch_ref_fasta.map{ _meta, fasta -> [ fasta ] }.collect(),
@@ -668,31 +584,34 @@ workflow PLASMOVAR {
         ch_multiqc_files = ch_multiqc_files.mix(GATK4_MARKDUPLICATES.out.metrics.collect{it[1]})
         ch_bam_markdup = GATK4_MARKDUPLICATES.out.bam
 
-    // TODO check sarek's method of collecting reports...or metrics? https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L447C1-L448C104
+        // TODO check sarek's method of collecting reports...or metrics? https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L447C1-L448C104
 
-    // TODO: picard module could be an alternative, but it can only process 1 sample at a time
-    // i.e. it does not merge samples while taking into account read groups.
-    // Requires manual concatenation/combining (https://nf-co.re/modules/samtools_cat/ or
-    // https://nf-co.re/modules/samtools_merge/), sorting
-    // (https://nf-co.re/modules/samtools_sort/) and indexing
-    // (https://nf-co.re/modules/samtools_index/) afterwards.
-    // Possible advantage: multiple read groups linear scales ram requirements
-    // https://gatk.broadinstitute.org/hc/en-us/articles/360035890531-Base-Quality-Score-Recalibration-BQSR
-    // PICARD_MARKDUPLICATES(
-    //     ch_bam,
-    //     ch_ref_fasta,
-    //     ch_ref_fai
-    // )
+        // TODO: picard module could be an alternative, but it can only process 1 sample at a time
+        // i.e. it does not merge samples while taking into account read groups.
+        // Requires manual concatenation/combining (https://nf-co.re/modules/samtools_cat/ or
+        // https://nf-co.re/modules/samtools_merge/), sorting
+        // (https://nf-co.re/modules/samtools_sort/) and indexing
+        // (https://nf-co.re/modules/samtools_index/) afterwards.
+        // Possible advantage: multiple read groups linear scales ram requirements
+        // https://gatk.broadinstitute.org/hc/en-us/articles/360035890531-Base-Quality-Score-Recalibration-BQSR
+        // PICARD_MARKDUPLICATES(
+        //     ch_bam,
+        //     ch_ref_fasta,
+        //     ch_ref_fai
+        // )
 
-    // TODO     SAMTOOLS_FAIDX.out.fai.map{ _meta, fai -> fai }.first() vs .collect()
-    // To obtain a channel with just the file, which is not consumed by a task, a value channel is needed.
-    // both first and collect create value channels, but first is clearer and creates a one item singleton channel, whereas collect creates a list.
+        //
+        // samtools sort and index bam files and collect alignment stats
+        //
 
-    //
-    // samtools sort and index bam files and collect alignment stats
-    //
-
-    // TODO: move into subworkflow?
+        // TODO: move into subworkflow?
+        // Examples:
+        // https://github.com/nf-core/modules/blob/master/subworkflows/nf-core/bam_stats_samtools/main.nf
+        // https://github.com/nf-core/modules/blob/master/subworkflows/nf-core/bam_markduplicates_samtools/main.nf
+        // https://github.com/nf-core/modules/blob/master/subworkflows/nf-core/bam_sort_stats_samtools/main.nf
+        // https://github.com/nf-core/modules/blob/master/subworkflows/nf-core/bam_stats_samtools/main.nf
+        // https://github.com/nf-core/modules/blob/master/subworkflows/nf-core/fastq_align_bwa/main.nf
+        // https://github.com/nf-core/modules/blob/master/subworkflows/nf-core/bam_markduplicates_picard/main.nf
 
         // Sort and index duplicate marked bam files
         SAMTOOLS_SORT_MARKDUP(ch_bam_markdup, ch_ref_fasta_fai, 'bai')
@@ -721,7 +640,18 @@ workflow PLASMOVAR {
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.global_txt.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.regions_txt.collect{it[1]})
         ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH.out.summary_txt.collect{it[1]})
+
         // TODO: check behaviour of mosdepth when supplying a restricted list of intervals (e.g. ampliseq + QC metric for genes of interest during WGS)
+
+        // TODO: check out other possible alignment statistics modules:
+        // https://nf-co.re/modules/mosdepth/
+        // https://nf-co.re/modules/samtools_depth/
+        // https://nf-co.re/modules/samtools_coverage/
+        // https://nf-co.re/modules/samtools_bedcov/
+        // https://nf-co.re/modules/coverm_genome/
+        // https://nf-co.re/modules/deeptools_bamcoverage/
+        // https://nf-co.re/modules/bedtools_coverage/
+        // https://nf-co.re/modules/deeptools_multibamsummary/
     }
 
     //
@@ -731,7 +661,6 @@ workflow PLASMOVAR {
     if (!skip_variantcalling && !skip_alignment) {
 
         // TODO: refactor into subworkflow
-
         // TODO: compare with approach used here https://github.com/nf-core/genomicrelatedness/blob/dev/subworkflows/local/combine_cram_crai_intervals/main.nf
 
         //
@@ -752,6 +681,11 @@ workflow PLASMOVAR {
         // VCF files (M interval VCFs, each with all N samples)
         //     ↓ PICARD_MERGEVCFS
         // Final VCF (1 file with all N samples, all M intervals)
+
+        // Process each sample x interval combination in parallel with HaplotpeCaller
+        // Group GVCFs for all samples per interval for GenomicsDBImport
+        // Process each interval in parallel with GenotypeGVCFs
+        // Merge intervals
 
         // Create GATK dictionary
         GATK4_CREATESEQUENCEDICTIONARY(ch_ref_fasta)
@@ -796,6 +730,8 @@ workflow PLASMOVAR {
         // seems to split multiple times inside each subworkflow
 
         // Base Quality Score Recalibration (BQSR)
+        // TODO: should BQSR be enabled by default or not? See concerns in docs.
+
         if (params.run_bqsr ==  true) {
             // Check if required files are supplied
             if (!params.bqsr_known_sites_vcf || !params.bqsr_known_sites_tbi) {
@@ -818,7 +754,6 @@ workflow PLASMOVAR {
                 params.bqsr_scatter,
                 params.bqsr_bed,
             )
-            // TODO: add table output to multiqc channel
             ch_multiqc_files = ch_multiqc_files.mix(BQSR.out.recalibration_table.collect{it[1]})
 
             // Prepare channel for HaplotypeCaller by recombining bam files with intervals
@@ -835,28 +770,13 @@ workflow PLASMOVAR {
                     [ combined_meta, bam, bai, interval ]
                 }
 
-        // TODO: is it useful to add BQSR or not?
-        // See concerns:
-        // - https://pmc.ncbi.nlm.nih.gov/articles/PMC5048557/
-        // - https://github.com/google/deepvariant/blob/r1.8/docs/deepvariant-details.md#input-assumptions
-        // > Running BQSR results in a small decrease in accuracy => deepvariant was trained on raw scores, so might not apply to GATK
-        // >  Modern base quality is well calibrated. At the standard 30x coverage, minor quality changes also barely matter. This is why all companies are binning quality. Illumina has done extensive evaluation and confirmed the effectiveness of binning. While raw base quality is estimated from signals and is not biased towards samples, BQSR introduces sample biases and reference biases. I have seen it shifts overall properties of the calls. BQSR also completely defeats the purpose of binning and doubles file sizes. I couldn't find papers showing BQSR is beneficial. GIAB folks, the group understands variant calling most, rarely runs BQSR, either. Don't waste your resources.
-
         // TODO: compare with two-pass approach https://github.com/nf-core/genomicrelatedness/blob/dev/subworkflows/local/base_quality_score_recalibration/main.nf
         // TODO: https://gatk.broadinstitute.org/hc/en-us/articles/360037433771-GatherBQSRReports
         // TODO: https://gatk.broadinstitute.org/hc/en-us/articles/360037066912-AnalyzeCovariates
         // cf. https://github.com/nf-core/genomicrelatedness/
         }
 
-        // Process each sample x interval combination in parallel with HaplotpeCaller
-        // Group GVCFs for all samples per interval for GenomicsDBImport
-        // Process each interval in parallel with GenotypeGVCFs
-        // Merge intervals
-
-        //
-        // Module: GATK4_HAPLOTYPECALLER (sample x interval)
-        // Call variants per sample per interval in parallel
-        //
+        // Call variants per sample per interval in parallel (sample x interval)
         GATK4_HAPLOTYPECALLER(
             ch_bam_bai_intervals.map{ combined_meta, bam, bai, interval ->
                 [ combined_meta, bam, bai, interval, [] ] },
@@ -894,20 +814,17 @@ workflow PLASMOVAR {
         // Rejoin with the actual interval file
         ch_genomicsdb_input = ch_gvcf_by_interval   // [ interval_meta, [gvcfs], [tbis] ]           (1 per sample)
             .combine(ch_intervals)                  // [ [interval_genome_meta.id], interval_list ] (1 per interval)
-            // [ interval_meta, [gvcfs], [tbis], [interval_genome_meta.id], interval_list]          (sample x interval)
             .map { interval_meta, gvcfs, tbis, _interval_meta, interval_file ->
                 // Match by interval name
                 if (interval_file.simpleName == interval_meta.interval_name) {
                     return [ interval_meta, gvcfs, tbis, interval_file, [], []]
                 }
             }
+            // [ interval_meta, [gvcfs], [tbis], [interval_genome_meta.id], interval_list]          (sample x interval)
             .filter { it != null }  // Remove non-matching combinations
             // TODO: is this needed?
 
-        //
-        // Module: GATK4_GENOMICSDBIMPORT (intervals)
         // Consolidate GVCFs per interval across all samples
-        //
         GATK4_GENOMICSDBIMPORT(
             ch_genomicsdb_input,
             false,  // run_intlist
@@ -928,10 +845,7 @@ workflow PLASMOVAR {
             }
             .filter { it != null }
 
-        //
-        // Module: GATK4_GENOTYPEGVCFS (intervals)
         // Perform joint genotyping per interval
-        //
         GATK4_GENOTYPEGVCFS(
             ch_genotype_input,
             ch_ref_fasta,
@@ -944,7 +858,7 @@ workflow PLASMOVAR {
         ch_vcf_tbi_by_interval = GATK4_GENOTYPEGVCFS.out.tbi    // [[meta], vcf.gz.tbi]
 
         //
-        // Subworkflow: VARIANT_FILTERING (intervals)
+        // Variant filtering subworkflow (intervals)
         //
 
         if (params.vcf_filter_mode == 'hard') {
@@ -979,13 +893,6 @@ workflow PLASMOVAR {
             ch_final_vcf_tbi = VARIANT_FILTERING_VQSR.out.vcf_filter_added_tbi  // [[meta], gathered.vcf.gz.tbi]
         }
     }
-    // TODO add BQSR
-
-    // TODO: add VQSR + hard filtering
-
-    // TODO: fastq-screen -> see separate branch
-
-    // TODO: filter vcf
 
     //
     // snpEff annotation
@@ -1032,19 +939,15 @@ workflow PLASMOVAR {
         )
     }
 
-
-
     // TODO: add step for gatk VariantsToTable -V "${ann_dir}/${species}/combined.filter_added.ann.vcf" -F CHROM -F POS -F TYPE -GF GT -O "${ann_dir}/${species}/combined.filter_added.table"
-
     // TODO: add bcf normalizes as safety measure?
-
     // TODO: add CDS/region information to annotation as done by MalariaGEN Pf8? https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/master/modules/variant_annotation.nf
-
-    // TODO: variant filtration as done by MalariaGEN Pf8? https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/master/modules/variant_filtration.nf
+    // TODO: check for other variant filtration options used in MalariaGEN Pf8? https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/master/modules/variant_filtration.nf
 
     //
     // Collate and save software versions
     //
+
     def topic_versions = channel.topic("versions")
         .distinct()
         .branch { entry ->
@@ -1072,8 +975,9 @@ workflow PLASMOVAR {
         )
 
     //
-    // MODULE: MultiQC
+    // Run MultiQC module
     //
+
     ch_multiqc_files = ch_multiqc_files.mix(ch_collated_versions)
     def ch_summary_params = paramsSummaryMap(workflow, parameters_schema: "nextflow_schema.json")
     def ch_workflow_summary = channel.value(paramsSummaryMultiqc(ch_summary_params))

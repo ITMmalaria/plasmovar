@@ -37,6 +37,15 @@ workflow PIPELINE_INITIALISATION {
 
 // TODO: check input vs params.input and monochrome_logs options. Might get fixed after nf-core tools update.
 
+// TODO: optionally just return warnings instead of stopping the pipeline. Non-unique entries should still be caught further downstream and this would allow non-standard files to be processed if there is just a single run per sample (or even just no repeated lanes/lib combinations).
+
+// Test cases
+// assert extractLaneFromFilename('sample_L001_R1.fastq.gz') == '001'
+// assert extractLaneFromFilename('sample_L1_R1.fastq.gz') == '001'
+// assert extractLaneFromFilename('sample_lane2_R1.fastq.gz') == '002'
+// assert extractLaneFromFilename('sample_100_R1.fastq.gz') == null  // Not a lane!
+
+
     main:
 
     ch_versions = channel.empty()
@@ -169,8 +178,6 @@ workflow PIPELINE_INITIALISATION {
     versions    = ch_versions
 }
 
-// TODO: lane can be changed to "run" to be more general?
-
 // TODO: check what happens if there is no lane info (or no laned runs): https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L287 (meta.size might be needed, but it is set to 1 by default in sarek for all entries unless something happens in align step?)
 
 // TODO: check behaviour for single end data
@@ -179,12 +186,6 @@ workflow PIPELINE_INITIALISATION {
 // if so, entire block can be simplified by just creating meta.sample-meta.lane immediately
 
 // TODO; try to create sample-lane id manual, then add num_lanes, check what size= is, add branching option for single end reads
-
-// TODO: changed to sample, re-create id (combined sample-lane) because this is used by downstream modules
-
-// TODO: remove first part because of redundancy, not necessary if there are no patients....although we do need the count of the number of lanes per sample
-// TODO or do we?
-// see readgroup construct: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L949
 
 // TODO: check branching options for multiple types of inputs https://github.com/nextflow-io/nf-validation/blob/750a56d02ce902508eb7777188b034d0b8f3435c/docs/samplesheets/examples.md
 
@@ -468,14 +469,6 @@ def sanitizeMetadataValue(value) {
     return value?.toString()?.replaceAll(/[^A-Za-z0-9._-]/, '_')
 }
 
-// TODO: optionally just return warnings instead of stopping the pipeline. Non-unique entries should still be caught further downstream and this would allow non-standard files to be processed if there is just a single run per sample (or even just no repeated lanes/lib combinations).
-
-// Test cases
-// assert extractLaneFromFilename('sample_L001_R1.fastq.gz') == '001'
-// assert extractLaneFromFilename('sample_L1_R1.fastq.gz') == '001'
-// assert extractLaneFromFilename('sample_lane2_R1.fastq.gz') == '002'
-// assert extractLaneFromFilename('sample_100_R1.fastq.gz') == null  // Not a lane!
-
 //
 // Generate methods description for MultiQC
 //
@@ -560,4 +553,49 @@ def methodsDescriptionText(mqc_methods_yaml) {
     def description_html = engine.createTemplate(methods_text).make(meta)
 
     return description_html.toString()
+}
+
+
+// Add GATK read group to meta (and remove redundant lane, library and flowcell info)
+// Adapted from nf-core/sarek: https://github.com/nf-core/sarek/blob/5cc30494a6b8e7e53be64d308b582190ca7d2585/workflows/sarek/main.nf#L940
+// See read group info here: https://gatk.broadinstitute.org/hc/en-us/articles/360035890671-Read-groups
+// List of RG fields is defined by SAM format: https://samtools.github.io/hts-specs/SAMv1.pdf
+// Recommended usage: https://support.sentieon.com/appnotes/read_groups/
+def addReadgroupToMeta(meta, files) {
+    // Define RG values, only adding non-empty values
+    // This avoids problems with Picard and the need for the `VALIDATION_STRINGENCY LENIENT` option,
+    // since there will not be any empty fields like CN in the following example:
+    // @RG	ID:106264-002-079.22NY35LT3.L007	CN:	PU:22NY35LT3.L007	SM:106264-002-079	LB:106264-002-079	PL:ILLUMINA
+
+    // If we cannot read the flowcell ID from the fastq file, then we don't use it
+    def RG_ID = meta.flowcell ? "${meta.sample}.${meta.flowcell}.${meta.lane}" : "${meta.sample}.${meta.lane}"
+
+    // For LB, check if library is defined in input samplesheet (trim handles case of empty string)
+    def RG_LB = meta.library?.trim() ? "${meta.sample}.${meta.library}" : "${meta.sample}"
+
+    // PU should be set to combination of flowcell and lane.
+    def RG_PU = meta.flowcell ? "${meta.flowcell}.${meta.lane}" : null
+
+    def RG_map = [
+        ID: RG_ID,
+        SM: meta.sample,
+        LB: RG_LB,
+        PL: params.seq_platform,                // defaults to ILLUMINA (nextflow.config)
+        CN: params.seq_center?.trim() ?: null,  // most likely blank
+        PU: RG_PU,                              // used by BQSR if present, defaults to ID otherwise
+    ]
+
+    // Build RG string: filter out empty fields and format as RG string `key:value`
+    def RG_fields = RG_map
+        // example input map: [ID: "sample1", SM: "sample1", CN: null, PU: "flowcell.L001"]
+        .findAll { _key, value -> value != null && value != ''}
+        // returns map: [ID: "sample1", SM: "sample1", PU: "flowcell.L001"]
+        .collect { key, value -> "${key}:${value}" }
+        // returns list: ["ID:sample1", "SM:sample1", "PU:flowcell.L001"]
+
+    def read_group = "\"@RG\\t${RG_fields.join('\\t')}\""
+
+    meta  = meta - meta.subMap('lane', 'flowcell', 'library') + [read_group: read_group.toString()]
+
+    return [ meta, files ]
 }

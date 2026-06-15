@@ -57,8 +57,6 @@ Additionally required input files are reference genome fasta files ([see below](
 
 Now, you can run the pipeline using:
 
-<!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
-
 ```bash
 NXF_SYNTAX_PARSER=v1 nextflow run ITMmalaria/plasmovar \
    -profile <docker/singularity/.../institute> \
