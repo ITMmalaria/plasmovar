@@ -7,7 +7,7 @@ process GATK4_VARIANTRECALIBRATOR {
     // Based on MalariaGEN Pf8 implementation - https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/master/modules/variant_recalibration_build_model.nf (MIT license)
     // and the existing nf-core module - https://nf-co.re/modules/gatk4_variantrecalibrator/
     tag "${meta.id}_${mode}"
-    label 'process_high'    // TODO is low or medium enough?
+    label 'process_low'
 
     conda "${moduleDir}/environment.yml"
     container "${workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container
