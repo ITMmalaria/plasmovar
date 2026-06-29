@@ -10,6 +10,10 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 
 - Add option to emit invariant sites during joint genotype calling (`gatk GenotypeGVCFs -all-sites`) and enable it by default.
 
+### `Improved`
+
+- Changed default interval_list scatter count from 20 to 10 (which is what e.g. _P. falciparum_ 3D7 defaults to for its 14+2 chromosomes when using the `BALANCING_WITHOUT_INTERVAL_SUBDIVISION_WITH_OVERFLOW` option for `IntervalListTools`).
+
 ## 0.3.0 - [2026-06-15]
 
 ### `Added`

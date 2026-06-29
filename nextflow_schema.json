@@ -451,7 +451,7 @@
             "properties": {
                 "scatter_count": {
                     "type": "integer",
-                    "default": 20,
+                    "default": 10,
                     "description": "Maximum number of interval_list files into which the provided intervals (provided by `reference_bed` or automatically extracted from the reference genome fasta) will be combined for the scattered/parallel processing of the GATK steps.",
                     "fa_icon": "fas fa-th"
                 },
