@@ -544,6 +544,12 @@
                     "default": false,
                     "description": "Save intermediate VCF files created during various variant calling and filtering steps. Defaults to false, which results in only the SNPEff annotated file being published.",
                     "fa_icon": "fas fa-download"
+                },
+                "include_non_variant_sites": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to emit every site that was jointly genotyped, including invariant sites.",
+                    "help": "This enables the `-all-sites`/`--include-non-variant-sites` option of GATK4 GenotypeGVCFs."
                 }
             }
         },
