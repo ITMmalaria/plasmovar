@@ -795,7 +795,7 @@
                 },
                 "vqsr_indel_annotations": {
                     "type": "string",
-                    "default": "-an QD -an FS -an SOR -an ReadPosRankSum",
+                    "default": "-an QD -an FS -an SOR -an MQRankSum -an ReadPosRankSum",
                     "description": "Annotations to use for INDEL VQSR model training.",
                     "help_text": "Variant annotations to use for building the INDEL VQSR model. To be supplied as complete GATK CLI arguments (e.g., '-an QD -an FS -an SOR')."
                 },
