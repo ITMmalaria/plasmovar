@@ -2,7 +2,14 @@
 // SUBWORKFLOW: VARIANT_FILTERING_VQSR
 //
 
+// For more info on order of steps, see:
+//  https://github.com/broadgsa/gatk/blob/master/doc_archive/tutorials/(howto)_Recalibrate_variant_quality_scores_=_run_VQSR.md,
+//  https://github.com/broadgsa/gatk/blob/master/doc_archive/faqs/,Which_training_sets___arguments_should_I_use_for_running_VQSR%3F.md, and
+//  https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering,
+// or the MalariaGEN Pf8 pipeline: https://github.com/malariagen/malariagen-pf8-snp-indel-calling/blob/529fe6b59bbf14a99d8c46264f6a38c4761a0ffa/main.nf#L134
+
 include { GATK4_MERGEVCFS as GATHER_VCFS_BEFORE_VQSR                   } from '../../../modules/nf-core/gatk4/mergevcfs/main'
+include { GATK4_MAKESITESONLYVCF                                       } from '../../../modules/local/gatk4/makesitesonlyvcf/main'
 include { GATK4_VARIANTRECALIBRATOR as GATK4_VARIANTRECALIBRATOR_SNP   } from '../../../modules/local/gatk4/variantrecalibrator'
 include { GATK4_VARIANTRECALIBRATOR as GATK4_VARIANTRECALIBRATOR_INDEL } from '../../../modules/local/gatk4/variantrecalibrator'
 include { GATK4_APPLYVQSR as GATK4_APPLYVQSR_SNP                       } from '../../../modules/nf-core/gatk4/applyvqsr/main'
@@ -41,7 +48,11 @@ workflow VARIANT_FILTERING_VQSR {
         ch_vcfs_to_gather,
         ch_ref_dict
     )
-    ch_gathered_vcf_tbi_for_vqsr = GATHER_VCFS_BEFORE_VQSR.out.vcf.join(GATHER_VCFS_BEFORE_VQSR.out.tbi)
+    ch_gathered_vcf_tbi = GATHER_VCFS_BEFORE_VQSR.out.vcf.join(GATHER_VCFS_BEFORE_VQSR.out.tbi)
+
+    // Create sites-only VCF - VQSR modelling does not require sample-level annotations
+    GATK4_MAKESITESONLYVCF(ch_gathered_vcf_tbi)
+    ch_gathered_sites_only_vcf_tbi_for_vqsr_modelling = GATK4_MAKESITESONLYVCF.out.vcf.join(GATK4_MAKESITESONLYVCF.out.tbi)
 
     // Create resource channels
     ch_snp_vcfs = channel.fromPath(params.vqsr_snp_resource_vcfs, checkIfExists: true)
@@ -50,9 +61,9 @@ workflow VARIANT_FILTERING_VQSR {
     ch_indel_vcfs = channel.fromPath(params.vqsr_indel_resource_vcfs, checkIfExists: true)
     ch_indel_tbis = channel.fromPath(params.vqsr_indel_resource_vcfs.collect { tbi -> "${tbi}.tbi" }, checkIfExists: true)
 
-    // Build VQSR model for SNP
+    // Build VQSR model for SNPs - uses sites-only vcf input
     GATK4_VARIANTRECALIBRATOR_SNP(
-        ch_gathered_vcf_tbi_for_vqsr,
+        ch_gathered_sites_only_vcf_tbi_for_vqsr_modelling,
         'SNP',
         ch_ref_fasta.map{ _meta, fasta -> fasta },
         ch_ref_fai.map{ _meta, fai -> fai },
@@ -62,21 +73,9 @@ workflow VARIANT_FILTERING_VQSR {
         params.vqsr_snp_resource_labels
     )
 
-    // Apply VQSR for SNPs
-    GATK4_APPLYVQSR_SNP(
-        ch_gathered_vcf_tbi_for_vqsr
-            .combine(GATK4_VARIANTRECALIBRATOR_SNP.out.recal.map { _meta, recal -> recal })
-            .combine(GATK4_VARIANTRECALIBRATOR_SNP.out.idx.map { _meta, idx -> idx })
-            .combine(GATK4_VARIANTRECALIBRATOR_SNP.out.tranches.map { _meta, tranches -> tranches }),
-        ch_ref_fasta.map{ _meta, fasta -> fasta },
-        ch_ref_fai.map{ _meta, fai -> fai },
-        ch_ref_dict.map{ _meta, dict -> dict }
-    )
-
-    // Build VQSR model for indel using the recalibrated SNP VCF
-    // For more info on order of steps, see https://github.com/broadgsa/gatk/blob/master/doc_archive/tutorials/(howto)_Recalibrate_variant_quality_scores_=_run_VQSR.md
+    // Build VQSR model for indels - uses sites-only VCF input
     GATK4_VARIANTRECALIBRATOR_INDEL(
-        GATK4_APPLYVQSR_SNP.out.vcf.join(GATK4_APPLYVQSR_SNP.out.tbi),
+        ch_gathered_sites_only_vcf_tbi_for_vqsr_modelling,
         'INDEL',
         ch_ref_fasta.map{ _meta, fasta -> fasta },
         ch_ref_fai.map{ _meta, fai -> fai },
@@ -86,10 +85,21 @@ workflow VARIANT_FILTERING_VQSR {
         params.vqsr_indel_resource_labels
     )
 
-    // Apply VQSR for INDELs
+    // Apply VQSR to SNPs - use original VCF with sample-level genotype annotations
+    GATK4_APPLYVQSR_SNP(
+        ch_gathered_vcf_tbi
+            .combine(GATK4_VARIANTRECALIBRATOR_SNP.out.recal.map { _meta, recal -> recal })
+            .combine(GATK4_VARIANTRECALIBRATOR_SNP.out.idx.map { _meta, idx -> idx })
+            .combine(GATK4_VARIANTRECALIBRATOR_SNP.out.tranches.map { _meta, tranches -> tranches }),
+        ch_ref_fasta.map{ _meta, fasta -> fasta },
+        ch_ref_fai.map{ _meta, fai -> fai },
+        ch_ref_dict.map{ _meta, dict -> dict }
+    )
+    ch_gathered_vcf_tbi_snp_recal = GATK4_APPLYVQSR_SNP.out.vcf.join(GATK4_APPLYVQSR_SNP.out.tbi)
+
+    // Apply VQSR to INDELs - uses recalibrated SNP VCF as input
     GATK4_APPLYVQSR_INDEL(
-        GATK4_APPLYVQSR_SNP.out.vcf
-            .join(GATK4_APPLYVQSR_SNP.out.tbi)
+        ch_gathered_vcf_tbi_snp_recal
             .combine(GATK4_VARIANTRECALIBRATOR_INDEL.out.recal.map { _meta, recal -> recal })
             .combine(GATK4_VARIANTRECALIBRATOR_INDEL.out.idx.map { _meta, idx -> idx })
             .combine(GATK4_VARIANTRECALIBRATOR_INDEL.out.tranches.map { _meta, tranches -> tranches }),
@@ -99,8 +109,6 @@ workflow VARIANT_FILTERING_VQSR {
     )
 
     emit:
-    vcf_filter_added = GATK4_APPLYVQSR_INDEL.out.vcf // [[meta], sorted.vcf.gz] - with filter tags
-    vcf_filter_added_tbi = GATK4_APPLYVQSR_INDEL.out.tbi // [[meta], sorted.vcf.gz.tbi] - with filter tags
-    // vcf_filtered         = // [[meta], sorted.vcf.gz] - filtered
-    // vcf_filtered_tbi     = // [[meta], sorted.vcf.gz.tbi] - filtered
+    vcf_filter_added     = GATK4_APPLYVQSR_INDEL.out.vcf    // [[meta], sorted.vcf.gz] - with filter tags/annotations, no omitted sites
+    vcf_filter_added_tbi = GATK4_APPLYVQSR_INDEL.out.tbi    // [[meta], sorted.vcf.gz.tbi]
 }

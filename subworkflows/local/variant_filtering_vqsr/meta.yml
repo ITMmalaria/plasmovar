@@ -14,6 +14,7 @@ keywords:
   - scatter-gather
 components:
   - gatk4/mergevcfs
+  - gatk4/makesitesonlyvcf
   - gatk4/variantrecalibrator
   - gatk4/applyvqsr
 input:

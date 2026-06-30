@@ -13,10 +13,12 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 ### `Improved`
 
 - Changed default interval_list scatter count from 20 to 10 (which is what e.g. _P. falciparum_ 3D7 defaults to for its 14+2 chromosomes when using the `BALANCING_WITHOUT_INTERVAL_SUBDIVISION_WITH_OVERFLOW` option for `IntervalListTools`).
+- Run VQSR on sites-only VCF to speed up model building step (see [GATK VQSR tutorial](https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering)).
 
 ### `Fixed`
 
 - Added missing `an MQRankSum` option for VQSR INDEL recalibration model building.
+- Reorder VQSR steps, clarify channel names and fix inputs for `VariantRecalibrator`/`ApplyVQSR`. Now both the SNP and INDEL model building steps are executed prior to recalibration. The INDEL recalibration model building step was using the SNP-recalibrated VCF as an input, instead of the raw VCF. (This was not wrong, but it was confusing and differed from the procedure outlined in the [GATK VQSR tutorial](https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering).)
 
 ## 0.3.0 - [2026-06-15]
 
