@@ -14,6 +14,7 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 
 - Changed default interval_list scatter count from 20 to 10 (which is what e.g. _P. falciparum_ 3D7 defaults to for its 14+2 chromosomes when using the `BALANCING_WITHOUT_INTERVAL_SUBDIVISION_WITH_OVERFLOW` option for `IntervalListTools`).
 - Run VQSR on sites-only VCF to speed up model building step (see [GATK VQSR tutorial](https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering)).
+- Improved documentation and citation message (e.g., clarify that this pipeline utilises nf-core components, but that it is not an official nf-core pipeline itself).
 
 ### `Fixed`
 
