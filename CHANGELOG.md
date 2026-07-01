@@ -17,6 +17,7 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 - Improved documentation and citation message (e.g., clarify that this pipeline utilises nf-core components, but that it is not an official nf-core pipeline itself).
 - Attempt to make Nextflow caching behaviour more deterministic by sorting the content of various channels before aggregating/combining them. E.g., scattered per-interval files are sorted on interval_list index prior to gathering for certain `GATK` steps, and samples are sorted prior to joining by intervals as the input for `GenomicsDBImport`.
 - Removed `GATK4_HAPLOTYPECALLER` ext.args that was the same as the `HaplotypeCaller`'s default value (`--contamination-fraction-to-filter 0.0`).
+- Make BQSR subworkflow slightly more robust by prioritising `bqsr_scatter` over `bqsr_bed` (i.e. in non-scatter mode, a potential bed file is ignored).
 
 ### `Fixed`
 

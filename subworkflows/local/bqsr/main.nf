@@ -125,8 +125,13 @@ workflow BQSR {
         ch_known_sites_tbi
     )
 
-    // Collect scattered tables into a single table for ApplyBQSR when using scatter mode (either custom or original gatk intervals)
-    if (scatter || bed) {
+    // In non-scatter mode, to combine the single recalibration table with sample-level bam channel,
+    // key by sample id explicitly (because full meta differs; interval_name is missing from table channel)
+    if (!scatter) {
+        ch_table = GATK4_BASERECALIBRATOR.out.table.map { meta, table -> [meta.sample, table] }
+    }
+    // In scatter mode (either custom or original gatk intervals), collect scattered tables into a single table for ApplyBQSR
+    else if (scatter || bed) {
         ch_table = GATK4_BASERECALIBRATOR.out.table                 // [[meta], table] (sample x interval)
             // 1) sort on interval index for deterministic channel order
             // 2) remove interval-specific meta field
@@ -145,14 +150,9 @@ workflow BQSR {
             }
         GATK4_GATHERBQSRREPORTS(ch_table)
 
-        // In scatter mode, to combine the gathered table with interval-level bam channel,
+        // Combine gathered table with interval-level bam channel,
         // key by sample id explicitly (because full meta differs; interval_name is missing from table channel)
         ch_table = GATK4_GATHERBQSRREPORTS.out.table.map { meta, table -> [meta.sample, table] }
-    }
-    // In non-scatter mode, to combine the single recalibration table with sample-level bam channel,
-    // key by sample id explicitly (because full meta differs; interval_name is missing from table channel)
-    else if (!scatter) {
-        ch_table = GATK4_BASERECALIBRATOR.out.table.map { meta, table -> [meta.sample, table] }
     }
 
     // Combine sample-level bam channel with the single recalibration table
