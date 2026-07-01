@@ -7,6 +7,7 @@
 
 include { GATK4_SELECTVARIANTS as SELECT_SNP                     } from '../../../modules/nf-core/gatk4/selectvariants/main'
 include { GATK4_SELECTVARIANTS as SELECT_INDEL                   } from '../../../modules/nf-core/gatk4/selectvariants/main'
+include { GATK4_SELECTVARIANTS as SELECT_INVARIANT               } from '../../../modules/nf-core/gatk4/selectvariants/main'
 include { GATK4_SELECTVARIANTS as EXCLUDE_FILTERED_SNP           } from '../../../modules/nf-core/gatk4/selectvariants/'
 include { GATK4_SELECTVARIANTS as EXCLUDE_FILTERED_INDEL         } from '../../../modules/nf-core/gatk4/selectvariants/'
 include { GATK4_VARIANTFILTRATION as FILTER_SNP                  } from '../../../modules/nf-core/gatk4/variantfiltration/main'
@@ -20,10 +21,11 @@ include { GATK4_MERGEVCFS as GATHER_VCFS_BY_INTERVAL_FILTERED     } from '../../
 workflow VARIANT_FILTERING_HARD {
 
     take:
-    ch_vcf_by_interval  // [[meta], vcf.gz, vcf.gz.tbi] - 1 per interval
-    ch_ref_fasta        // [[meta], fasta]
-    ch_ref_fai          // [[meta], fasta.fai]
-    ch_ref_dict         // [[meta], dict]
+    ch_vcf_by_interval          // [[meta], vcf.gz, vcf.gz.tbi] - 1 per interval
+    ch_ref_fasta                // [[meta], fasta]
+    ch_ref_fai                  // [[meta], fasta.fai]
+    ch_ref_dict                 // [[meta], dict]
+    include_non_variant_sites   // boolean
 
     main:
 
@@ -35,6 +37,13 @@ workflow VARIANT_FILTERING_HARD {
         ch_vcf_by_interval.map { meta, vcf, tbi -> [meta, vcf, tbi, []] },
     )
 
+    // If the option to retain invariant sites was selected, extract them separately for later merging
+    if (include_non_variant_sites) {
+        SELECT_INVARIANT(
+            ch_vcf_by_interval.map { meta, vcf, tbi -> [meta, vcf, tbi, []] },
+        )
+    }
+
     // Annotate VCFs with filter tags
     FILTER_SNP(
         SELECT_SNP.out.vcf.join(SELECT_SNP.out.tbi),
@@ -42,14 +51,13 @@ workflow VARIANT_FILTERING_HARD {
         ch_ref_fai,
         ch_ref_dict,
         [[:], []],  // gzi index is only needed if fasta input is in bgzip format
-        // ch_gzi,
     )
     FILTER_INDEL(
         SELECT_INDEL.out.vcf.join(SELECT_INDEL.out.tbi),
         ch_ref_fasta,
         ch_ref_fai,
         ch_ref_dict,
-        [[:], []],  // ch_gzi,
+        [[:], []],  // gzi index is only needed if fasta input is in bgzip format
     )
 
     // Exclude filtered variants from VCF
@@ -68,6 +76,12 @@ workflow VARIANT_FILTERING_HARD {
     def ch_filter_added = FILTER_SNP.out.vcf
         .join(FILTER_INDEL.out.vcf)
         .map { meta, snp_vcf, indel_vcf -> [meta, [snp_vcf, indel_vcf]] }
+    // Optionally add invariant sites
+    if (include_non_variant_sites) {
+        ch_filter_added = ch_filter_added
+            .join(SELECT_INVARIANT.out.vcf)
+            .map { meta, vcfs, no_var_vcf -> [meta, vcfs + [no_var_vcf]] }
+    }
     CONCAT_VCFS_SNP_INDEL_FILTER_ADDED(
         ch_filter_added,   // [[meta], [snp.vcf.gz, indel.vcf.gz]]
         ch_ref_dict,
@@ -77,6 +91,12 @@ workflow VARIANT_FILTERING_HARD {
     def ch_filtered = EXCLUDE_FILTERED_SNP.out.vcf
         .join(EXCLUDE_FILTERED_INDEL.out.vcf)
         .map { meta, snp_vcf, indel_vcf -> [meta, [snp_vcf, indel_vcf]] }
+    // Optionally add invariant sites
+    if (include_non_variant_sites) {
+        ch_filtered = ch_filtered
+            .join(SELECT_INVARIANT.out.vcf)
+            .map { meta, vcfs, no_var_vcf -> [meta, vcfs + [no_var_vcf]] }
+    }
     CONCAT_VCFS_SNP_INDEL_FILTERED(
         ch_filtered,       // [[meta], [snp.vcf.gz, indel.vcf.gz]]
         ch_ref_dict,

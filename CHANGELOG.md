@@ -8,7 +8,7 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 
 ### `Added`
 
-- Add option to emit invariant sites during joint genotype calling (`gatk GenotypeGVCFs -all-sites`) and enable it by default.
+- Add option to emit invariant sites during joint genotype calling (`gatk GenotypeGVCFs -all-sites`) and enable it by default. During hard filtering, invariant sites are temporarily set aside using SelectVariants (`--select-type-to-include NO_VARIATION`) and later merged again with the filtered SNP/INDEL VCFs.
 
 ### `Improved`
 

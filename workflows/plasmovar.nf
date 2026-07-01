@@ -941,7 +941,7 @@ workflow PLASMOVAR {
                 ch_ref_fasta,
                 ch_ref_fai,
                 ch_ref_dict,
-                // ch_gzi,
+                params.include_non_variant_sites
             )
             ch_final_vcf = VARIANT_FILTERING_HARD.out.vcf_filter_added          // [[meta], gathered.vcf.gz]
             ch_final_vcf_tbi = VARIANT_FILTERING_HARD.out.vcf_filter_added_tbi  // [[meta], gathered.vcf.gz.tbi]
