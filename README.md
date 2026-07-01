@@ -2,7 +2,7 @@
 
 <!-- [![GitHub Actions CI Status](https://github.com/ITMmalaria/plasmovar/actions/workflows/nf-test.yml/badge.svg)](https://github.com/ITMmalaria/plasmovar/actions/workflows/nf-test.yml) -->
 <!-- [![GitHub Actions Linting Status](https://github.com/ITMmalaria/plasmovar/actions/workflows/linting.yml/badge.svg)](https://github.com/ITMmalaria/plasmovar/actions/workflows/linting.yml) -->
-<!-- [![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX) -->
+[![Cite with Zenodo DOI](https://zenodo.org/badge/1255852482.svg)](https://doi.org/10.5281/zenodo.21107164)
 [![nf-test](https://img.shields.io/badge/unit_tests-nf--test-337ab7.svg)](https://www.nf-test.com)
 [![Nextflow](https://img.shields.io/badge/version-%E2%89%A525.10.4-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D&link=https%3A%2F%2Fnextflow.io)](https://www.nextflow.io/)
 [![nf-core template version](https://img.shields.io/badge/nf--core_template-4.0.2-green?style=flat&logo=nfcore&logoColor=white&color=%2324B064&link=https%3A%2F%2Fnf-co.re)](https://github.com/nf-core/tools/releases/tag/4.0.2)
@@ -13,8 +13,6 @@
 ## Introduction
 
 **ITMmalaria/plasmovar** is a Nextflow pipeline for variant calling (snp/indel) of short-read whole-genome sequencing data of human malaria parasites (_Plasmodium_).
-
-
 
 <!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
      workflows use the "tube map" design for that. See https://nf-co.re/docs/community/brand/workflow-schematics#examples for examples.   -->
@@ -42,13 +40,11 @@
 
 A minimal samplesheet for the pipeline would be a simple csv containing a `sample` and `fastq_1` column (and `fastq_2` for paired-end sequencing data). Each row represents a fastq file (single-end) or a pair of fastq files (paired end) derived from a particular biological sample.
 
-
 ```csv title="minimal-samplesheet.csv"
 sample,fastq_1,fastq_2
 sample-1,sample-1_R1.fastq.gz,sample-1_R2.fastq.gz
 sample-2,sample-2_R1.fastq.gz,sample-2_R2.fastq.gz
 ```
-
 More detailed information can be founded in the [usage documentation](./docs/usage.md).
 
 Additionally required input files are reference genome fasta files ([see below](#reference-genome-files)) as well as other files depending on the selected options. For more info, please have a look at the [parameter documentation](./docs/parameters.md).
@@ -90,7 +86,7 @@ hostremoval_reference: "./data/ref/GRCh38.chr21.fa.gz"
 fastqscreen_fastas: "./data/ref/Pfalciparum/PlasmoDB-release-68/PlasmoDB-68_Pfalciparum3D7_Genome.fasta,./data/ref/GRCh38.chr21.fa.gz" # comma-separated list of all genomes to screen against
 ```
 
-To use `gatk` base quality score recalibration and variant quality score recalibration, high-quality VCF files with known variants need to be supplied. For the former, a (subset) of variants passing quality filters in one of the MalariaGEN Pf# releases can be used ([https://www.malariagen.net/resource/34/](https://www.malariagen.net/resource/34/)), for the latter _in-vivo P. falciparum_ crosses between laboratory strains can be used ([available here](https://www.malariagen.net/data_package/pf-crosses-1-0/)), as described in the supplementary materials of the publication [Pf8: an open dataset of Plasmodium falciparum genome variation in 33,325 worldwide samples](https://doi.org/10.6084/m9.figshare.29153447).
+To use `gatk` base quality score recalibration and variant quality score recalibration, high-quality VCF files with known variants need to be supplied. For the former, a (subset) of variants passing quality filters in one of the MalariaGEN Pf# releases can be used ([https://www.malariagen.net/resource/34/](https://www.malariagen.net/resource/34/)), for the latter _in-vivo P. falciparum_ crosses between laboratory strains can be used ([available here](https://www.malariagen.net/data_package/pf-crosses-1-0/)), as described in the supplementary materials of the publication [Pf8: an open dataset of _Plasmodium falciparum_ genome variation in 33,325 worldwide samples](https://doi.org/10.6084/m9.figshare.29153447).
 
 For species without a well-described _truth_ set, a bootstrapping approach can be employed for BQSR instead (as described [here](https://gatk.broadinstitute.org/hc/en-us/articles/360035890831-Known-variants-Training-resources-Truth-sets)), although the need for BQSR is somewhat debated. For VQSR, the simplest alternative is to disable it and rely on hard filtering instead.
 
@@ -132,7 +128,7 @@ ITMmalaria/plasmovar was originally written by Pieter Moris at the Malariology U
 
 We thank the Nextflow and nf-core community for their extensive assistance in the development of this pipeline, through documentation, guidelines, examples and the support provided via channels such as Slack and GitHub.
 
-Parts of this pipeline were developed using suggestions from Seqera AI, but no code was copied verbatim without thorough manual curation and validation. Examples include e.g. best practices for channel manipulation, comparison with existing nf-core implementations validation, etc.
+Parts of this pipeline were developed using suggestions from Seqera AI, but no code was copied verbatim without thorough manual curation and validation. Examples include e.g. best practices for channel manipulation, comparison with existing nf-core implementations and guidelines, etc.
 
 <!-- We thank the following people for their extensive assistance in the development of this pipeline: -->
 
@@ -145,7 +141,7 @@ If you would like to contribute to this pipeline, please see the [contributing g
 ## Citations
 
 <!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-If you use ITMmalaria/plasmovar for your analysis, please cite it using the following doi: [pending].
+If you use ITMmalaria/plasmovar for your analysis, please cite it using the Zenodo DOI: [![DOI](https://zenodo.org/badge/1255852482.svg)](https://doi.org/10.5281/zenodo.21107164)
 
 An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 

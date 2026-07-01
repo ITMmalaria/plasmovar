@@ -26,7 +26,7 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 - Added missing `an MQRankSum` option for VQSR INDEL recalibration model building.
 - Reorder VQSR steps, clarify channel names and fix inputs for `VariantRecalibrator`/`ApplyVQSR`. Now both the SNP and INDEL model building steps are executed prior to recalibration. The INDEL recalibration model building step was using the SNP-recalibrated VCF as an input, instead of the raw VCF. (This was not wrong, but it was confusing and differed from the procedure outlined in the [GATK VQSR tutorial](https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering).)
 - Avoid potential file name collisions for recalibrated bam files.
-- Remove unused prefix def in custom fastqscreen/fastqscreen module.
+- Remove unused prefix def in custom `fastqscreen/fastqscreen` module.
 
 ### `Dependencies`
 
@@ -37,8 +37,8 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 
 ### `Added`
 
-- Allow order of host read removal and trimming to be toggled via `--trimming_before_hostremoval`.
-- Add bgzip and tabix step after SnpEff annotation.
+- Allow order of host read removal and trimming to be toggled via `--trimming_before_hostremoval`. Defaults to `true`, i.e. reads are trimmed/removed by `fastp` before they are passed on to `deacon`.
+- Add `bgzip` and `tabix` step after `SnpEff` annotation.
 - Base quality score recalibration (BQSR), or more specifically the `gatk BaseRecalibrator` step, can now be run without scattering/parallellization over intervals (`--bqsr_scatter false`), or by scattering over distinct intervals from those used in the rest of the pipeline (`--bqsr_bed <bed-file>`). This avoids problems when the known sites VCF contains different genomic regions from those used elsewhere in the pipeline.
 - Added option to save BQSR BAM files (`--save_bqsr_bam`).
 
@@ -48,9 +48,9 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
    - `--save_intermediate_gvcf` -> `--save_gvcf`
    - `--save_bam_final` -> `--save_bam`
 - Changed file publishing behaviour for:
-   - VCF files: only the final bgzipped-filter-added-and-annotated VCF file is now published by default. All other intermediate VCF files (GenotypeGVCFs, MergeVcfs, filtered VCFs) are now only published when the `--save_intermediate_vcf` option is enabled.
+   - VCF files: only the final bgzipped-filter-added-and-annotated VCF file is now published by default. All other intermediate VCF files (`GenotypeGVCFs`, `MergeVcfs`, filtered VCFs) are now only published when the `--save_intermediate_vcf` option is enabled.
    - VQSR output folder is now named `vqsr` instad of `filter_vqsr`.
-- Switch resource requirements to VariantRecalibrator to low.
+- Switch resource requirements of the `VariantRecalibrator` process to low.
 
 ## v0.2.0 - [2026-06-10]
 
@@ -70,7 +70,6 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 - The resource requirements for `seqkit sort` were changed in order to (hopefully) avoid OOM (out-of-memory) errors when processing large fastq files when using the SLURM job scheduler. The process now requests more initial RAM and does not request additional CPU on retries (always 4 threads as per [the seqkit docs recommendations](https://bioinf.shenwei.me/seqkit/usage/#parallelization-of-cpu-intensive-jobs)).
 - Fix bug in samplesheet parsing for single-end input where auto-detected flowcell information was not being assigned correctly to the meta map.
 - Flowcell detection should now be compatible with (most) SRA/ENI fastq files (fastq header prefixed with space separated accession before the Illumina header).
-
 
 ## v0.1.0 - [2026-06-06]
 
