@@ -1,0 +1,32 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: plasmovar
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Pieter
+    family-names: Moris
+    email: pmoris@itg.be
+    affiliation: Institute of Tropical Medicine Antwerp
+    orcid: 'https://orcid.org/0000-0003-4242-4939'
+identifiers:
+  - type: doi
+    value: 10.1000/pending
+    description: Zenodo DOI
+repository-code: 'https://github.com/ITMmalaria/plasmovar'
+abstract: >-
+  ITMmalaria/plasmovar is a Nextflow pipeline for variant
+  calling (snp/indel) of short-read whole-genome sequencing
+  data of human malaria parasites (_Plasmodium_).
+keywords:
+  - whole genome sequencing
+  - malaria
+  - variant calling
+  - nextflow
+license: MIT
+version: 0.4.0
+date-released: '2026-07-01'
