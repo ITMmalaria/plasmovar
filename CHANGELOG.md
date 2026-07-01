@@ -24,6 +24,7 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 - Added missing `an MQRankSum` option for VQSR INDEL recalibration model building.
 - Reorder VQSR steps, clarify channel names and fix inputs for `VariantRecalibrator`/`ApplyVQSR`. Now both the SNP and INDEL model building steps are executed prior to recalibration. The INDEL recalibration model building step was using the SNP-recalibrated VCF as an input, instead of the raw VCF. (This was not wrong, but it was confusing and differed from the procedure outlined in the [GATK VQSR tutorial](https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering).)
 - Avoid potential file name collisions for recalibrated bam files.
+- Remove unused prefix def in custom fastqscreen/fastqscreen module.
 
 ### `Dependencies`
 

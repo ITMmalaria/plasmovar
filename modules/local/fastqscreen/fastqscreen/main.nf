@@ -24,7 +24,6 @@ process FASTQSCREEN_FASTQSCREEN {
     task.ext.when == null || task.ext.when
 
     script:
-    def prefix = task.ext.prefix ?: "${meta.id}"
     def args = task.ext.args ?: ""
 
     def valid_aligners = ['bowtie', 'bowtie2', 'bwa', 'minimap2']
@@ -47,7 +46,6 @@ process FASTQSCREEN_FASTQSCREEN {
     """
 
     stub:
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch test_1_screen.html
     touch test_1_screen.png
