@@ -118,7 +118,7 @@ Configure intervals of genomic regions for scatter/gather parallelization of GAT
 
 | Parameter | Description | Type | Default | Required | Hidden |
 |-----------|-----------|-----------|-----------|-----------|-----------|
-| `scatter_count` | Maximum number of interval_list files into which the provided intervals (provided by `reference_bed` or automatically extracted from the reference genome fasta) will be combined for the scattered/parallel processing of the GATK steps. | `integer` | 20 |  |  |
+| `scatter_count` | Maximum number of interval_list files into which the provided intervals (provided by `reference_bed` or automatically extracted from the reference genome fasta) will be combined for the scattered/parallel processing of the GATK steps. | `integer` | 10 |  |  |
 | `save_interval_scatter` | Save scattered interval lists (for debugging purposes). | `boolean` | False |  |  |
 
 ## GATK base quality score recalibration (BQSR) options
@@ -143,6 +143,8 @@ Configure GATK variant calling options
 | `save_genomicsdb` | Save GenomicsDB workspace. | `boolean` | False |  |  |
 | `save_gvcf` | Save intermediate GVCF files from HaplotypeCaller. Defaults to false. | `boolean` | False |  |  |
 | `save_intermediate_vcf` | Save intermediate VCF files created during various variant calling and filtering steps. Defaults to false, which results in only the SNPEff annotated file being published. | `boolean` | False |  |  |
+| `include_non_variant_sites` | Whether to emit every site that was jointly genotyped, including invariant sites. | `boolean` | True |  |  |
+| `ploidy` | Sample ploidy to pass to GATK HaplotypeCaller. Defaults to GATK's 2 when omitted. | `integer` |  |  |  |
 
 ## Variant filtering options
 
@@ -183,7 +185,7 @@ Configure variant filtering tools.
 | `vqsr_snp_tranches` | Tranches for SNP VQSR model. <details><summary>Help</summary><small>List of sensitivity tranches for the SNP VQSR model, in the format -tranche 100.0 -tranche 99.95 ... .</small></details>| `string` | -tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 -tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 90.0 |  |  |
 | `vqsr_indel_resource_vcfs` | List of VCF files to use as training resources for INDEL VQSR. <details><summary>Help</summary><small>Array of paths to high-confidence VCF files used for training the INDEL variant quality score recalibration model. Should be supplied in the same order as the resource labels.</small></details>| `array` |  |  |  |
 | `vqsr_indel_resource_labels` | Resource labels for INDEL VQSR training files. <details><summary>Help</summary><small>Array of GATK resource specifications for each INDEL training VCF. Should be supplied in the same order as the resource VCFs. Format: '--resource:name,known=false,training=true,truth=true,prior=15.0'</small></details>| `array` |  |  |  |
-| `vqsr_indel_annotations` | Annotations to use for INDEL VQSR model training. <details><summary>Help</summary><small>Variant annotations to use for building the INDEL VQSR model. To be supplied as complete GATK CLI arguments (e.g., '-an QD -an FS -an SOR').</small></details>| `string` | -an QD -an FS -an SOR -an ReadPosRankSum |  |  |
+| `vqsr_indel_annotations` | Annotations to use for INDEL VQSR model training. <details><summary>Help</summary><small>Variant annotations to use for building the INDEL VQSR model. To be supplied as complete GATK CLI arguments (e.g., '-an QD -an FS -an SOR').</small></details>| `string` | -an QD -an FS -an SOR -an MQRankSum -an ReadPosRankSum |  |  |
 | `vqsr_indel_tranches` | Tranches for INDEL VQSR model. <details><summary>Help</summary><small>List of sensitivity tranches for the INDEL VQSR model, in the format -tranche 100.0 -tranche 99.95 ... .</small></details>| `string` | -tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 -tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 90.0 |  |  |
 | `vqsr_snp_max_gaussians` | Max number of Gaussians for the positive model when recalibrating SNPs. <details><summary>Help</summary><small>When not provided, the GATK default of 8 will be used.</small></details>| `integer` |  |  |  |
 | `vqsr_indel_max_gaussians` | Max number of Gaussians for the positive model when recalibrating INDELs. <details><summary>Help</summary><small>When not provided, the GATK default of 8 will be used.</small></details>| `integer` |  |  |  |
