@@ -125,8 +125,8 @@ workflow VARIANT_FILTERING_HARD {
     )
 
     emit:
-    vcf_filter_added     = GATHER_VCFS_BY_INTERVAL_FILTER_ADDED.out.vcf   // [[meta], sorted.vcf.gz] - with filter tags
-    vcf_filter_added_tbi = GATHER_VCFS_BY_INTERVAL_FILTER_ADDED.out.tbi   // [[meta], sorted.vcf.gz.tbi] - filter tags
-    vcf_filtered         = GATHER_VCFS_BY_INTERVAL_FILTERED.out.vcf       // [[meta], sorted.vcf.gz] - filtered
-    vcf_filtered_tbi     = GATHER_VCFS_BY_INTERVAL_FILTERED.out.tbi       // [[meta], sorted.vcf.gz.tbi] - filtered
+    vcf_filter_added     = GATHER_VCFS_BY_INTERVAL_FILTER_ADDED.out.vcf   // [[meta], sorted.vcf.gz]        - with filter tags
+    vcf_filter_added_tbi = GATHER_VCFS_BY_INTERVAL_FILTER_ADDED.out.tbi   // [[meta], sorted.vcf.gz.tbi]    - filter tags
+    vcf_filtered         = GATHER_VCFS_BY_INTERVAL_FILTERED.out.vcf       // [[meta], sorted.vcf.gz]        - filtered
+    vcf_filtered_tbi     = GATHER_VCFS_BY_INTERVAL_FILTERED.out.tbi       // [[meta], sorted.vcf.gz.tbi]    - filtered
 }

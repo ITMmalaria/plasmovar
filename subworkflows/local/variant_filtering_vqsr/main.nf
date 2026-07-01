@@ -53,6 +53,8 @@ workflow VARIANT_FILTERING_VQSR {
     )
     ch_gathered_vcf_tbi = GATHER_VCFS_BEFORE_VQSR.out.vcf.join(GATHER_VCFS_BEFORE_VQSR.out.tbi)
 
+    // TODO: optional add ExcessHet filter for large cohorts. See https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering
+
     // Create sites-only VCF - VQSR modelling does not require sample-level annotations
     GATK4_MAKESITESONLYVCF(ch_gathered_vcf_tbi)
     ch_gathered_sites_only_vcf_tbi_for_vqsr_modelling = GATK4_MAKESITESONLYVCF.out.vcf.join(GATK4_MAKESITESONLYVCF.out.tbi)
