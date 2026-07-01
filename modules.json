@@ -22,12 +22,17 @@
                     },
                     "deacon/filter": {
                         "branch": "master",
-                        "git_sha": "9b261a459473bc8e2d830bfc626f480c0733f4fe",
+                        "git_sha": "719abfd0ec41bcc7e2f540b4fd5c8150fdfe228e",
                         "installed_by": ["modules"]
                     },
                     "deacon/index": {
                         "branch": "master",
-                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+                        "git_sha": "719abfd0ec41bcc7e2f540b4fd5c8150fdfe228e",
+                        "installed_by": ["modules"]
+                    },
+                    "deacon/indexdiff": {
+                        "branch": "master",
+                        "git_sha": "719abfd0ec41bcc7e2f540b4fd5c8150fdfe228e",
                         "installed_by": ["modules"]
                     },
                     "fastp": {

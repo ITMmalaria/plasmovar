@@ -17,7 +17,7 @@ include { FASTQSCREEN_FASTQSCREEN                } from '../modules/local/fastqs
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_INDEXER } from '../modules/nf-core/bbmap/bbsplit/main'
 include { BBMAP_BBSPLIT as BBMAP_BBSPLIT_MAPPER  } from '../modules/nf-core/bbmap/bbsplit/main'
 include { DEACON_INDEX                           } from '../modules/nf-core/deacon/index/main'
-include { DEACON_INDEX_DIFF                      } from '../modules/local/deacon/diff/main'
+include { DEACON_INDEXDIFF                       } from '../modules/nf-core/deacon/indexdiff/main'
 include { DEACON_FILTER                          } from '../modules/nf-core/deacon/filter/main'
 // Prepare reference genome
 include { CREATE_INTERVALS_BED                   } from '../modules/local/create_intervals_bed/main'
@@ -440,8 +440,8 @@ workflow PLASMOVAR {
             // Subtract shared minimizers between parasite index and host index (see https://github.com/bede/deacon?tab=readme-ov-file#set-operations)
             if ( params.hostremoval_deacon_diff ) {
                 log.info("Reference genome will be subtracted from pre-built reference index for deacon host removal.")
-                DEACON_INDEX_DIFF(ch_ref_fasta, ch_deacon_index)
-                ch_deacon_index = DEACON_INDEX_DIFF.out.index.map{ meta, index ->
+                DEACON_INDEXDIFF(ch_deacon_index, ch_ref_fasta)
+                ch_deacon_index = DEACON_INDEXDIFF.out.index.map{ meta, index ->
                     def index_id = "${meta.id}_diff_${ref_basename}"
                     [ [ id: index_id ], index ]
                 }
