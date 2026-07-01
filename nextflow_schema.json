@@ -550,6 +550,11 @@
                     "default": true,
                     "description": "Whether to emit every site that was jointly genotyped, including invariant sites.",
                     "help": "This enables the `-all-sites`/`--include-non-variant-sites` option of GATK4 GenotypeGVCFs."
+                },
+                "ploidy": {
+                    "type": "integer",
+                    "description": "Sample ploidy to pass to GATK HaplotypeCaller. Defaults to GATK's 2 when omitted.",
+                    "help": "Refer to the GATK documentation for more info on ploidy settings: https://gatk.broadinstitute.org/hc/en-us/articles/360035889691-Does-GATK-work-on-non-diploid-organisms & https://gatk.broadinstitute.org/hc/en-us/articles/30332006386459-HaplotypeCaller"
                 }
             }
         },
