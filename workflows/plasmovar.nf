@@ -722,25 +722,58 @@ workflow PLASMOVAR {
 
         // TODO: add simpler strategy that just splits bed file into 1 task per contig + add more meta data about contig name
 
-        // Split chrom/contigs into separate interval_list files for scatter-gather parallel processing
+        // Divide chrom/contigs (or bed targets) across interval_list files for scatter-gather parallel processing
         GATK4_INTERVALLISTTOOLS(GATK4_BEDTOINTERVALLIST.out.interval_list)
         ch_intervals = GATK4_INTERVALLISTTOOLS.out.interval_list
-            // [ [interval_genome_meta.id], [interval_list, interval_list, ...] ] (single element)
+            // [ [interval_genome_meta.id], [interval_list, interval_list, ...] ]               (single element)
+            .map { meta, interval_lists ->
+                tuple(
+                    meta,
+                    interval_lists.withIndex()
+                )
+            }
+            // [ [interval_genome_meta.id], [ [interval_list, 0], [interval_list, 1], ...] ]    (single element channel)
             .transpose()
-            // [ [interval_genome_meta.id], interval_list ] (multiple elements)
+            // [ [interval_genome_meta.id], [interval_list, 0] ]                                (multiple elements in channel, 1 for each interval_list)
+            .map { meta, indexed_interval ->
+                def (interval_list, idx) = indexed_interval
+                def genome_id = meta.id // GATK4_INTERVALLISTTOOLS passes its input genome meta.id
+                def interval_name = interval_list.simpleName
+                tuple(
+                    meta + [
+                        id: "${genome_id}_${interval_name}",
+                        genome_id: genome_id,
+                        interval_index: idx,
+                        interval_name: interval_name
+                    ],
+                    // meta + [
+                    //     id: "${meta.id}_${interval_list.simpleName}",
+                    //     genome_id: meta.id,
+                    //     interval_index: idx,
+                    //     interval_name: interval_list.simpleName
+                    // ],
+                    interval_list
+                )
+            }
+            // [ [interval_genome_meta.id, interval_index, interval_name], interval_list ]      (multiple elements in channel, 1 for each interval_list)
 
+        // Combine each sample's bam file with each interval_list
+        // (or rather, copy the bam - bam files are not subset to the interval regions but passed in their entirety)
         ch_bam_bai_intervals = ch_bam_bai
             .combine(ch_intervals)
-            .map { bam_meta, bam, bai, interval_genome_meta, interval ->
+            .map { bam_meta, bam, bai, interval_meta, interval ->
                 def combined_meta = bam_meta + [
-                    // add unique id per sample/interval combination
-                    id: "${bam_meta.id}_${interval.simpleName}",
-                    genome_id: interval_genome_meta.id,
-                    interval_name: interval.simpleName
+                    id: "${bam_meta.id}_${interval_meta.interval_name}",    // add unique id per sample/interval combination
+                    genome_id: interval_meta.genome_id,
+                    interval_index: interval_meta.interval_index,
+                    interval_name: interval_meta.interval_name
                 ]
                 [ combined_meta, bam, bai, interval ]
             }
-            // [ [combined_meta.id, combined_meta.sample, combined_meta.num_entries, combined_meta.multiple_lanes, combined_meta.multiple_libraries, combined_meta.data_type, combined_meta.genome_id, combined_meta.interval_name], bam, bai, interval_list ]
+            // [ [combined_meta.id, combined_meta.sample, combined_meta.num_entries, combined_meta.multiple_lanes, combined_meta.multiple_libraries, multiple_flowcells, combined_meta.data_type,
+            //  combined_meta.genome_id, combined_meta.interval_index, combined_meta.interval_name],
+            //  bam, bai, interval_list ]
+            // (sample x interval)
 
         // TODO: check if bed or interval_list is preferred
 
@@ -780,16 +813,18 @@ workflow PLASMOVAR {
             )
             ch_multiqc_files = ch_multiqc_files.mix(BQSR.out.recalibration_table.collect{it[1]})
 
-            // Prepare channel for HaplotypeCaller by recombining bam files with intervals
+            // Prepare channel for HaplotypeCaller by scattering bam files over intervals again
+            // because BQSR ApplyBQSR runs in non-scattered mode and drops interval-level metadata.
             ch_bam_bai_intervals = BQSR.out.bam_recalibrated
                 .join(BQSR.out.bai_recalibrated, by: 0)
                 .combine(ch_intervals)
                 // re-add meta fields that were omitted during scatter-gather operations in BQSR
-                .map { recalibrated_bam_meta, bam, bai, interval_genome_meta, interval ->
+                .map { recalibrated_bam_meta, bam, bai, interval_meta, interval ->
                     def combined_meta = recalibrated_bam_meta + [
-                        id: "${recalibrated_bam_meta.id}_${interval.simpleName}",
-                        genome_id: interval_genome_meta.id,
-                        interval_name: interval.simpleName
+                        id: "${recalibrated_bam_meta.id}_${interval_meta.interval_name}",
+                        genome_id: interval_meta.genome_id,
+                        interval_index: interval_meta.interval_index,
+                        interval_name: interval_meta.interval_name
                     ]
                     [ combined_meta, bam, bai, interval ]
                 }
@@ -813,61 +848,67 @@ workflow PLASMOVAR {
         ch_gvcf = GATK4_HAPLOTYPECALLER.out.vcf      // [[meta], vcf.gz]
         ch_gvcf_tbi = GATK4_HAPLOTYPECALLER.out.tbi  // [[meta], tbi]
 
-        // Collect all samples for each interval for genomicsDBimport
-        ch_gvcf_by_interval = ch_gvcf
-            // [ [meta.id, meta.sample, meta.num_entries, meta.multiple_lanes, meta.multiple_libraries, meta.data_type, meta.genome_id, meta.interval_name], gvcf ]
-            .join(ch_gvcf_tbi, by: 0)                   // Join gvcf and tbi by meta
-            // [ meta, gvcf, tbi ]
+        // Gather all samples for each interval for genomicsDBimport
+        ch_gvcf_by_interval = ch_gvcf                                       // [ [meta - sample + interval], gvcf ]                 (sample x interval)
+            // Join gvcf and tbi by meta
+            .join(ch_gvcf_tbi, by: 0)                                       // [ meta, gvcf, tbi ]                                  (sample x interval)
             .map { meta, gvcf, tbi ->
                 def interval_key = "${meta.genome_id}_${meta.interval_name}"
-                [ interval_key, meta, gvcf, tbi ]
+                [ interval_key, [meta.sample, meta, gvcf, tbi] ]            // [ interval_key, [ meta.sample, meta, gvcf, tbi ] ]   (sample x interval)
             }
-            // [interval_key, meta, gvcf, tbi]
-            .groupTuple(by: 0)                          // Group by interval
-            // [ interval_key, [meta, meta, ...], [gvcf, gvcf, ...], [tbi, tbi, ...] ]
-            .map { interval_key, metas, gvcfs, tbis ->
-                def interval_meta = [                   // Create new meta without sample info
+            // Group by interval
+            .groupTuple(by: 0)                                              // [ interval_key, [ [ meta, gvcf, tbi ], ... ] ]       (1 per interval)
+            .map { interval_key, entries ->
+                def sorted = entries.sort { it[0] }
+                def metas = sorted.collect { it[1] }
+                def gvcfs = sorted.collect { it[2] }
+                def tbis  = sorted.collect { it[3] }
+                // Create new meta without sample info
+                def interval_meta = [
                     id: interval_key,
                     genome_id: metas[0].genome_id,
+                    interval_index: metas[0].interval_index,
                     interval_name: metas[0].interval_name
                 ]
-                [ interval_meta, gvcfs, tbis ]
+                [ interval_meta, gvcfs, tbis ]                              // [ interval_meta, gvcfs, tbis ]                       (1 per interval)
             }
-            // [ interval_meta, [gvcfs], [tbis] ]
 
-        // Rejoin with the actual interval file
-        ch_genomicsdb_input = ch_gvcf_by_interval   // [ interval_meta, [gvcfs], [tbis] ]           (1 per sample)
-            .combine(ch_intervals)                  // [ [interval_genome_meta.id], interval_list ] (1 per interval)
-            .map { interval_meta, gvcfs, tbis, _interval_meta, interval_file ->
-                // Match by interval name
-                if (interval_file.simpleName == interval_meta.interval_name) {
-                    return [ interval_meta, gvcfs, tbis, interval_file, [], []]
+        // Re-join inputs for GenomicsDB (= GVCFs for all samples grouped by interval) with the matching interval_list files
+        ch_genomicsdb_input = ch_gvcf_by_interval                   // [ [interval_meta], [gvcfs], [tbis] ]                 (1 per interval)
+            .map { interval_meta, gvcfs, tbis ->
+                [ interval_meta.interval_name, interval_meta, gvcfs, tbis ]
+            }
+            .join(
+                ch_intervals.map { interval_meta, interval_file ->  // [ interval_meta, interval_list ]                     (1 per interval)
+                    [ interval_meta.interval_name, interval_file ]
                 }
+            )
+            .map { _interval_name, meta, gvcfs, tbis, interval_file ->
+                [ meta, gvcfs, tbis, interval_file, [], [] ]        // [ [interval_meta], [gvcfs], [tbis], interval_list ]  (sample x interval)
             }
-            // [ interval_meta, [gvcfs], [tbis], [interval_genome_meta.id], interval_list]          (sample x interval)
-            .filter { it != null }  // Remove non-matching combinations
-            // TODO: is this needed?
 
-        // Consolidate GVCFs per interval across all samples
+        // Collect GVCFs for each sample into a GenomicsDB per interval
         GATK4_GENOMICSDBIMPORT(
             ch_genomicsdb_input,
             false,  // run_intlist
             false,  // run_updatewspace
             false   // input_map
         )
-        ch_genomicsdb = GATK4_GENOMICSDBIMPORT.out.genomicsdb  // [[meta], genomicsdb_dir]
+        ch_genomicsdb = GATK4_GENOMICSDBIMPORT.out.genomicsdb
 
-        // Prepare channels for GenotypeGVCFs by matching genomicsdb with corresponding interval file
-        ch_genotype_input = ch_genomicsdb   // (1 per interval)
-            .combine(ch_intervals)          // (1 per interval)
-            // [ meta, genomicsdb_dir, interval_meta, interval_list ] (interval x genomicsb_interval_dirs => contains mismatched elements
-            .map { meta, genomicsdb, _interval_meta, interval_file ->
-                // Match by interval name
-                if (interval_file.simpleName == meta.interval_name) {
-                    return [ meta, genomicsdb, [], interval_file, [] ]
-                }
+        // Prepare channels for GenotypeGVCFs by matching GenomicsDB with corresponding interval_list file
+        ch_genotype_input = ch_genomicsdb
+            .map { meta, genomicsdb ->                          // [ [interval_meta], genomicsdb_dir ]                      (1 per interval)
+                [ meta.interval_name, meta, genomicsdb ]
             }
-            .filter { it != null }
+            .join(
+                ch_intervals.map { meta, interval_file ->       // [ [interval_meta], interval_list ]                       (1 per interval)
+                    [ meta.interval_name, interval_file ]
+                }
+            )
+            .map { _interval_name, meta, genomicsdb, interval_file ->
+                [ meta, genomicsdb, [], interval_file, [] ]     // [ [interval_meta], genomicsdb, [], interval_list, [] ]   (sample x interval)
+            }
 
         // Perform joint genotyping per interval
         GATK4_GENOTYPEGVCFS(
@@ -878,8 +919,8 @@ workflow PLASMOVAR {
             [[:], []],  // dbsnp (optional)
             [[:], []]   // dbsnp_tbi (optional)
         )
-        ch_vcf_by_interval = GATK4_GENOTYPEGVCFS.out.vcf        // [[meta], vcf.gz] (1 per interval)
-        ch_vcf_tbi_by_interval = GATK4_GENOTYPEGVCFS.out.tbi    // [[meta], vcf.gz.tbi]
+        ch_vcf_by_interval = GATK4_GENOTYPEGVCFS.out.vcf        // [[meta], vcf.gz]     (1 per interval)
+        ch_vcf_tbi_by_interval = GATK4_GENOTYPEGVCFS.out.tbi    // [[meta], vcf.gz.tbi] (1 per interval)
 
         //
         // Variant filtering subworkflow (intervals)

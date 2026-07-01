@@ -29,16 +29,19 @@ workflow VARIANT_FILTERING_VQSR {
 
     // Prepare for VCF gathering: collect all interval VCFs without index
     // Group by genome_id to merge all intervals for that genome
-    ch_vcfs_to_gather = ch_vcf_by_interval
-        // [ meta, vcf ]    (1 per interval)
+    // Sort on interval index for deterministic channel order
+    ch_vcfs_to_gather = ch_vcf_by_interval                              // [ meta, vcf, tbi ]                                       (1 per interval)
         .map { meta, vcf, _tbi ->
-            [ meta.genome_id, vcf ]
+            [ meta.genome_id, [index: meta.interval_index, vcf: vcf] ]  // [ meta, [ index, vcf ] ]                                 (1 per interval)
         }
-        .groupTuple(by: 0)
-        // [ meta.genome_id, [vcfs] ] (1 element with all interval files)
+        .groupTuple(by: 0)                                              // [ meta.genome_id, [ [index, vcf], [index_vcf], ... ] ]   (1 element with all per-interval files)
         .map { genome_id, vcfs ->
+            // sort on interval_list index to make channel inputs for gathering interval VCFs more deterministic
+            def sorted_vcfs = vcfs
+                .sort { it.index }
+                .collect { it.vcf }
             def final_meta = [ id: "${genome_id}_merged", genome_id: genome_id ]
-            [ final_meta, vcfs ]
+            [ final_meta, sorted_vcfs ]                                 // [ meta, [ vcfs ] ]                                       (1 element with all per-interval files)
         }
 
     // Gather interval VCFs into single cohort VCF

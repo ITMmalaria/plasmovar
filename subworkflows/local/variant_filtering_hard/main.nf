@@ -84,27 +84,32 @@ workflow VARIANT_FILTERING_HARD {
 
     // Prepare for VCF merging: gather all interval VCFs
     // Group by genome_id to merge all intervals for that genome
-    ch_vcfs_to_merge_filter_added = CONCAT_VCFS_SNP_INDEL_FILTER_ADDED.out.vcf
-        // [ meta, vcf ]    (1 per interval)
+    ch_vcfs_to_merge_filter_added = CONCAT_VCFS_SNP_INDEL_FILTER_ADDED.out.vcf  // [ interval_meta, vcf ]                                   (1 per interval)
         .map { meta, vcf ->
-            [ meta.genome_id, vcf ]
+            [ meta.genome_id,  [index: meta.interval_index, vcf: vcf]  ]        // [ meta.genome_id, [ index, vcf ] ]                       (1 per interval)
         }
-        .groupTuple(by: 0)
-        // [ meta.genome_id, [vcfs] ] (1 element with all interval files)
+        .groupTuple(by: 0)                                                      // [ meta.genome_id, [ [index, vcf], [index_vcf], ... ] ]   (1 element with all per-interval files)
         .map { genome_id, vcfs ->
+            // sort on interval_list index to make channel inputs for gathering interval VCFs more deterministic
+            def sorted_vcfs = vcfs
+                .sort { it.index }
+                .collect { it.vcf }
             def final_meta = [ id: "${genome_id}_merged", genome_id: genome_id ]
-            [ final_meta, vcfs ]
+            [ final_meta, sorted_vcfs ]                                         // [ meta, [ vcfs ] ]                                       (1 element with all per-interval files)
         }
-    ch_vcfs_to_merge_filtered = CONCAT_VCFS_SNP_INDEL_FILTERED.out.vcf
-        // [ meta, vcf ]    (1 per interval)
+
+    ch_vcfs_to_merge_filtered = CONCAT_VCFS_SNP_INDEL_FILTERED.out.vcf          // [ interval_meta, vcf ]                                   (1 per interval)
         .map { meta, vcf ->
-            [ meta.genome_id, vcf ]
+            [ meta.genome_id,  [index: meta.interval_index, vcf: vcf]  ]        // [ meta.genome_id, [ index, vcf ] ]                       (1 per interval)
         }
-        .groupTuple(by: 0)
-        // [ meta.genome_id, [vcfs] ] (1 element with all interval files)
+        .groupTuple(by: 0)                                                      // [ meta.genome_id, [ [index, vcf], [index_vcf], ... ] ]   (1 element with all per-interval files)
         .map { genome_id, vcfs ->
+            // sort on interval_list index to make channel inputs for gathering interval VCFs more deterministic
+            def sorted_vcfs = vcfs
+                .sort { it.index }
+                .collect { it.vcf }
             def final_meta = [ id: "${genome_id}_merged", genome_id: genome_id ]
-            [ final_meta, vcfs ]
+            [ final_meta, sorted_vcfs ]                                         // [ meta, [ vcfs ] ]                                       (1 element with all per-interval files)
         }
 
     // Gather interval VCFs into single cohort VCF
