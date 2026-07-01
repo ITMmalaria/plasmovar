@@ -28,6 +28,7 @@ Additionally, it (mostly) follows the [nf-core recommendations](https://nf-co.re
 ### `Dependencies`
 
 - Bumped `deacon` modules to 0.15.0 and swap the custom local index diff modules for the nf-core version ([see PR](https://github.com/nf-core/modules/pull/10027)).
+- Bumped `gatk4/haplotypecaller` and `seqkit/sort` modules to most recent version.
 
 ## 0.3.0 - [2026-06-15]
 
